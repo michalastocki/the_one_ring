@@ -20,20 +20,26 @@ from .resolver import CombatTest, Weapon
 
 @dataclass(frozen=True)
 class _StanceModifiers:
-    """Numeric effect of one BattleStance."""
+    """Numeric effect of one BattleStance.
+
+    parry_delta is a flat point adjustment added to (or subtracted from)
+    the combatant's Parry rating — not a multiplier. Real Parry ratings run
+    roughly 14-20 (Parry = 10 or 12, by culture, + Wits + any armour/shield
+    modifier), so a multiplier would blow up or zero out the TN outright;
+    a flat delta keeps stance a meaningful nudge rather than an on/off
+    switch. Matches actual play: "your target number [is] derived from
+    your combat stance plus your Parry rating" — additive, not scaled.
+    """
 
     attack_dice_modifier: int  # >0 = bonus Success Dice on own attacks, <0 = penalty dice
-    parry_multiplier: int      # how many times parry_rating counts toward effective Defence
-    defence_bonus: int = 0     # flat Defence bonus on top of the Parry contribution
+    parry_delta: int           # flat adjustment to Parry-based effective Defence
 
 
 _BATTLE_STANCE_MODIFIERS: dict[BattleStance, _StanceModifiers] = {
-    BattleStance.FORWARD: _StanceModifiers(attack_dice_modifier=1, parry_multiplier=0),
-    BattleStance.OPEN: _StanceModifiers(attack_dice_modifier=0, parry_multiplier=1),
-    BattleStance.DEFENSIVE: _StanceModifiers(attack_dice_modifier=-1, parry_multiplier=2),
-    BattleStance.REARWARD: _StanceModifiers(
-        attack_dice_modifier=-1, parry_multiplier=1, defence_bonus=2
-    ),
+    BattleStance.FORWARD: _StanceModifiers(attack_dice_modifier=1, parry_delta=-6),
+    BattleStance.OPEN: _StanceModifiers(attack_dice_modifier=0, parry_delta=0),
+    BattleStance.DEFENSIVE: _StanceModifiers(attack_dice_modifier=-1, parry_delta=6),
+    BattleStance.REARWARD: _StanceModifiers(attack_dice_modifier=-1, parry_delta=4),
 }
 
 # Flat Defence penalty applied while Weary, on top of the Weary rule that
@@ -111,10 +117,14 @@ class Combatant:
     ability_level:
         Rank of the combat skill used when this combatant attacks.
     strength_attribute:
-        Governing Strength attribute value (used to derive the attack TN).
+        Raw Strength attribute; not used in attack resolution today (the
+        attack TN is the target's Defence alone — an attacker's own
+        attributes don't add to it). Reserved for a future Mighty Blow
+        damage bonus, forwarded as CombatTest.attacker_strength_value.
     defence:
-        This combatant's base Defence rating, before any Parry contribution
-        from their current BattleStance (see :attr:`effective_defence`).
+        Any flat Defence bonus *beyond* Parry (cover, terrain, and the
+        like). Most combatants should leave this at 0 — Parry (below) is
+        the number that actually carries a character's defensive skill.
     armor_rating:
         Number of Success Dice rolled in a Break-Defence sub-test against
         this combatant.
@@ -135,8 +145,12 @@ class Combatant:
         while holding REARWARD, and REARWARD in turn can only be reached
         by another ranged attack — see CombatRound._resolve_attack.
     parry_rating:
-        This combatant's Parry bonus, counted toward Defence according to
-        their current *battle_stance*.
+        This combatant's Parry rating — their actual defensive stat, and
+        by far the dominant term in :attr:`effective_defence`. In practice
+        Parry = 10 or 12 (by culture) + Wits + any armour/shield modifier,
+        typically landing around 14-20 for a player character. BattleStance
+        then applies a flat point adjustment on top (see
+        :attr:`effective_defence`), not a multiplier of this value.
     wounds:
         Number of Wounds suffered so far. Any Wound is serious enough to
         take a combatant out of the fight (see :attr:`is_out_of_action`)
@@ -209,21 +223,17 @@ class Combatant:
 
     @property
     def effective_defence(self) -> int:
-        """Defence rating after BattleStance Parry and Fatigue modifiers.
+        """This is the attack TN a foe must beat to hit this combatant.
 
-        FORWARD drops Parry entirely, OPEN counts it once, DEFENSIVE counts
-        it twice, and REARWARD counts it once plus a flat +2 for standing
-        back from the melee. Being Weary then subtracts a further flat
-        penalty on top of whichever stance is active.
+        = defence (any non-Parry bonus) + parry_rating + the current
+        BattleStance's flat parry_delta - a Fatigue penalty while Weary.
+        FORWARD trades -6 Parry for +1 attack die; DEFENSIVE the reverse
+        (+6 Parry for -1 die); REARWARD gets +4 (its main protection is
+        being unreachable by melee at all, not this bonus).
         """
         mods = _BATTLE_STANCE_MODIFIERS[self.battle_stance]
         fatigue_penalty = _FATIGUE_DEFENCE_PENALTY if self.is_weary else 0
-        return (
-            self.defence
-            + mods.parry_multiplier * self.parry_rating
-            + mods.defence_bonus
-            - fatigue_penalty
-        )
+        return self.defence + self.parry_rating + mods.parry_delta - fatigue_penalty
 
     @property
     def attack_bonus_dice(self) -> int:
@@ -379,7 +389,6 @@ class CombatRound:
         range_penalty = _range_penalty_dice(attacker.weapon, attack_range)
         test = CombatTest(
             ability_level=attacker.ability_level,
-            attacker_strength_attribute=attacker.strength_attribute,
             target_defence=target.effective_defence,
             target_armor_rating=target.armor_rating,
             weapon=attacker.weapon,

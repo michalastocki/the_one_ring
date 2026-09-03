@@ -137,7 +137,7 @@ class TestFatigueEffects:
             parry_rating=4,
             battle_stance=BattleStance.DEFENSIVE,
         )
-        assert c.effective_defence == 10  # 3 + 2*4 - 1
+        assert c.effective_defence == 12  # 3 + 4 + 6 (Defensive) - 1 (fatigue)
 
 
 # ---------------------------------------------------------------------------
@@ -146,29 +146,29 @@ class TestFatigueEffects:
 
 class TestBattleStanceModifiers:
 
-    def test_forward_grants_bonus_die_and_drops_parry(self):
+    def test_forward_grants_bonus_die_and_a_parry_penalty(self):
         c = make_combatant("Hero", battle_stance=BattleStance.FORWARD, defence=3, parry_rating=4)
         assert c.attack_bonus_dice == 1
         assert c.attack_penalty_dice == 0
-        assert c.effective_defence == 3  # parry not counted
+        assert c.effective_defence == 1  # 3 + 4 - 6
 
     def test_open_is_the_no_modifier_baseline(self):
         c = make_combatant("Hero", battle_stance=BattleStance.OPEN, defence=3, parry_rating=4)
         assert c.attack_bonus_dice == 0
         assert c.attack_penalty_dice == 0
-        assert c.effective_defence == 7  # 3 + 1*4
+        assert c.effective_defence == 7  # 3 + 4 + 0
 
-    def test_defensive_grants_penalty_die_and_doubles_parry(self):
+    def test_defensive_grants_penalty_die_and_a_parry_bonus(self):
         c = make_combatant("Hero", battle_stance=BattleStance.DEFENSIVE, defence=3, parry_rating=4)
         assert c.attack_bonus_dice == 0
         assert c.attack_penalty_dice == 1
-        assert c.effective_defence == 11  # 3 + 2*4
+        assert c.effective_defence == 13  # 3 + 4 + 6
 
     def test_rearward_grants_attack_penalty_and_flat_defence_bonus(self):
         c = make_combatant("Hero", battle_stance=BattleStance.REARWARD, defence=3, parry_rating=4)
         assert c.attack_bonus_dice == 0
         assert c.attack_penalty_dice == 1
-        assert c.effective_defence == 9  # 3 + 1*4 + 2
+        assert c.effective_defence == 11  # 3 + 4 + 4
 
     def test_default_battle_stance_is_open(self):
         c = make_combatant("Hero", defence=3, parry_rating=4)
@@ -330,7 +330,7 @@ class TestCombatRoundBattleStanceWiring:
         assert result.total == 9
 
     def test_defensive_target_is_harder_to_hit_than_open_target(self):
-        hero = make_combatant("Hero", ability_level=1, strength_attribute=15)  # TN base=5
+        hero = make_combatant("Hero", ability_level=1)
 
         def attack_open_vs_defensive(target_stance):
             target = make_combatant(
@@ -341,11 +341,11 @@ class TestCombatRoundBattleStanceWiring:
             return combat_round.resolve({"Hero": "Orc"}, rng)[0].result
 
         open_result = attack_open_vs_defensive(BattleStance.OPEN)
-        assert open_result.target_number == 7  # 5 + 1*2
+        assert open_result.target_number == 2  # 0 + 2 + 0 (Open)
         assert open_result.outcome == TestOutcome.SUCCESS
 
         defensive_result = attack_open_vs_defensive(BattleStance.DEFENSIVE)
-        assert defensive_result.target_number == 9  # 5 + 2*2
+        assert defensive_result.target_number == 8  # 0 + 2 + 6 (Defensive)
         assert defensive_result.outcome == TestOutcome.FAILURE
 
 
@@ -356,11 +356,11 @@ class TestCombatRoundBattleStanceWiring:
 class TestCombatRoundWoundAndFatigueWiring:
 
     def test_weary_target_is_easier_to_hit_than_rested_target(self):
-        hero = make_combatant("Hero", ability_level=1, strength_attribute=15)  # TN base=5
+        hero = make_combatant("Hero", ability_level=1)
 
         def attack(target_endurance_current):
             target = make_combatant(
-                "Orc", defence=0, parry_rating=0, endurance_max=10, load=2,
+                "Orc", defence=5, parry_rating=0, endurance_max=10, load=2,
                 endurance_current=target_endurance_current,
             )
             rng = SequentialRandom([6, 3, 3, 1])  # initiative, then AD=3 + SD=1 -> total 4

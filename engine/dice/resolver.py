@@ -335,10 +335,13 @@ class Weapon:
 class CombatTest:
     """Attack test in structured combat.
 
-    Target Number for the attack:
-        TN = attacker_strength_tn + target_defence
-
-    where ``attacker_strength_tn = 20 - attacker_strength_attribute``.
+    Target Number for the attack is simply the target's Defence rating —
+    unlike a SkillTest, the attacker's own attributes do not add to the TN.
+    The attacker's proficiency is expressed entirely through their dice pool
+    (ability_level), the same way an adversary's stat block lists a TN
+    directly rather than deriving one from an attribute. (Confirmed against
+    actual play: a defender's Parry rating IS the TN attackers must beat,
+    not one term added to a second, separate attacker-side TN.)
 
     Break-Defence sub-test is triggered when:
     - The attack succeeds (or is an automatic success), AND
@@ -348,22 +351,20 @@ class CombatTest:
     ----------
     ability_level:
         Rank of the attack skill used.
-    attacker_strength_attribute:
-        The attacker's Strength attribute value.
     target_defence:
-        The target's Defence rating (added to TN).
+        The target's Defence rating — this *is* the attack's TN.
     target_armor_rating:
         Number of Success Dice rolled in the Break-Defence sub-test.
     weapon:
         Weapon stats.
     attacker_strength_value:
-        Raw Strength score (used for Mighty Blow damage).
+        Raw Strength score (reserved for a future Mighty Blow damage bonus;
+        not currently used in resolution).
     stance, is_miserable, is_weary, bonus_dice, penalty_dice:
         Standard modifiers.
     """
 
     ability_level: int
-    attacker_strength_attribute: int
     target_defence: int
     target_armor_rating: int
     weapon: Weapon
@@ -376,8 +377,7 @@ class CombatTest:
 
     @property
     def target_number(self) -> int:
-        strength_tn = 20 - self.attacker_strength_attribute
-        return strength_tn + self.target_defence
+        return self.target_defence
 
     def resolve(self, rng: random.Random | None = None) -> TestResult:
         """Execute the attack roll and, if applicable, the Break-Defence roll."""

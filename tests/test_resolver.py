@@ -329,25 +329,25 @@ class TestMagicalTest:
 
 class TestCombatTestTargetNumber:
 
-    def test_tn_combines_strength_and_defence(self):
+    def test_target_number_is_target_defence(self):
+        # The attacker's own attributes don't add to the TN — it's simply
+        # the target's (stance/Parry-modified) Defence.
         weapon = Weapon(damage=5, piercing_value=3)
         ct = CombatTest(
             ability_level=3,
-            attacker_strength_attribute=12,  # strength TN = 20-12 = 8
-            target_defence=4,
+            target_defence=12,
             target_armor_rating=2,
             weapon=weapon,
         )
-        assert ct.target_number == 12  # 8 + 4
+        assert ct.target_number == 12
 
     def test_success(self):
-        # TN = (20-10) + 2 = 12; AD=8, SD=[5] → 13 >= 12; AD≠10/GANDALF → no break
+        # TN = 12; AD=8, SD=[5] → 13 >= 12; AD≠10/GANDALF → no break
         weapon = Weapon(damage=5, piercing_value=10)
         rng = SequentialRandom([8, 5])
         ct = CombatTest(
             ability_level=1,
-            attacker_strength_attribute=10,
-            target_defence=2,
+            target_defence=12,
             target_armor_rating=0,
             weapon=weapon,
         )
@@ -359,8 +359,7 @@ class TestCombatTestTargetNumber:
         rng = SequentialRandom([1, 1])
         ct = CombatTest(
             ability_level=1,
-            attacker_strength_attribute=5,  # TN = 15 + 5 = 20
-            target_defence=5,
+            target_defence=20,
             target_armor_rating=0,
             weapon=weapon,
         )
@@ -380,8 +379,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([10])
         ct = CombatTest(
             ability_level=0,
-            attacker_strength_attribute=15,  # TN=5+0=5
-            target_defence=0,
+            target_defence=5,
             target_armor_rating=1,
             weapon=weapon,
         )
@@ -395,8 +393,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([12])  # GANDALF on attack AD
         ct = CombatTest(
             ability_level=0,
-            attacker_strength_attribute=15,
-            target_defence=0,
+            target_defence=5,
             target_armor_rating=1,
             weapon=weapon,
         )
@@ -408,8 +405,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([5, 5])  # AD=5 (hit), no break trigger
         ct = CombatTest(
             ability_level=1,
-            attacker_strength_attribute=15,  # TN=5
-            target_defence=0,
+            target_defence=5,
             target_armor_rating=2,
             weapon=weapon,
         )
@@ -422,8 +418,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([1])  # total=1, fails
         ct = CombatTest(
             ability_level=0,
-            attacker_strength_attribute=1,  # TN=19
-            target_defence=5,
+            target_defence=24,
             target_armor_rating=1,
             weapon=weapon,
         )
@@ -437,8 +432,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([10, 5])
         ct = CombatTest(
             ability_level=0,
-            attacker_strength_attribute=15,
-            target_defence=0,
+            target_defence=5,
             target_armor_rating=1,
             weapon=weapon,
         )
@@ -452,8 +446,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([10, 2])
         ct = CombatTest(
             ability_level=0,
-            attacker_strength_attribute=15,
-            target_defence=0,
+            target_defence=5,
             target_armor_rating=1,
             weapon=weapon,
         )
@@ -466,8 +459,7 @@ class TestCombatTestBreakDefence:
         rng = SequentialRandom([10])
         ct = CombatTest(
             ability_level=0,
-            attacker_strength_attribute=15,
-            target_defence=0,
+            target_defence=5,
             target_armor_rating=0,
             weapon=weapon,
         )
