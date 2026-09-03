@@ -14,7 +14,8 @@ from .models import (
 from .action_die import ActionDie
 from .success_die import SuccessDie
 from .roll_pool import RollPool
-from .resolver import resolve_test, SkillTest, CombatTest, ShadowTest, MagicalTest
+from .resolver import resolve_test, SkillTest, CombatTest, ShadowTest, MagicalTest, Weapon
+from .combat import Combatant, AttackOutcome, CombatRound, CombatEncounter
 
 __all__ = [
     "DieResult",
@@ -36,4 +37,9 @@ __all__ = [
     "CombatTest",
     "ShadowTest",
     "MagicalTest",
+    "Weapon",
+    "Combatant",
+    "AttackOutcome",
+    "CombatRound",
+    "CombatEncounter",
 ]

@@ -87,7 +87,6 @@ def resolve_test(
     pool = RollPool(
         ability_level=ability_level,
         stance=stance,
-        is_miserable=is_miserable,
         is_weary=is_weary,
         bonus_dice=bonus_dice,
         penalty_dice=penalty_dice,

@@ -20,8 +20,6 @@ class RollPool:
         Base number of Success Dice (0–6, representing the tested skill rank).
     stance:
         NORMAL, ENHANCED (roll 2 AD keep better), or WEAKENED (roll 2 AD keep worse).
-    is_miserable:
-        Character is in the Miserable state — EYE triggers automatic failure.
     is_weary:
         Character is in the Weary state — HOLLOW faces on Success Dice count as 0.
     bonus_dice:
@@ -36,11 +34,14 @@ class RollPool:
 
     When ENHANCED and WEAKENED are both active (e.g. via different sources)
     they cancel out and the test resolves as NORMAL.
+
+    Note: the Miserable state is not a pool parameter — it doesn't change how
+    many dice are rolled, only how the resulting EYE_OF_SAURON face is
+    interpreted. That check happens in :func:`resolve_test`.
     """
 
     ability_level: int
     stance: Stance = Stance.NORMAL
-    is_miserable: bool = False
     is_weary: bool = False
     bonus_dice: int = 0
     penalty_dice: int = 0
