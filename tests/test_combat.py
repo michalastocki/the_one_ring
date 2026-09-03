@@ -100,6 +100,45 @@ class TestCombatant:
         assert c.wounds == 1
         assert c.is_wounded is True
 
+    def test_wound_incapacitates_even_with_endurance_remaining(self):
+        c = make_combatant("Hero", endurance_max=10)
+        assert c.is_out_of_action is False
+        c.take_wound()
+        assert c.is_incapacitated is True
+        assert c.is_out_of_action is True
+        assert c.endurance_current == 10  # Endurance itself is untouched by the Wound
+
+    def test_not_incapacitated_without_a_wound(self):
+        c = make_combatant("Hero", endurance_max=10)
+        assert c.is_incapacitated is False
+
+
+# ---------------------------------------------------------------------------
+# Fatigue (Weary) effects
+# ---------------------------------------------------------------------------
+
+class TestFatigueEffects:
+
+    def test_weary_reduces_effective_defence(self):
+        rested = make_combatant("Hero", endurance_max=10, load=2, endurance_current=10, defence=5)
+        weary = make_combatant("Orc", endurance_max=10, load=2, endurance_current=2, defence=5)
+        assert rested.is_weary is False
+        assert weary.is_weary is True
+        assert rested.effective_defence == 5
+        assert weary.effective_defence == 4  # 5 - 1 fatigue penalty
+
+    def test_fatigue_penalty_stacks_with_battle_stance(self):
+        c = make_combatant(
+            "Hero",
+            endurance_max=10,
+            load=4,
+            endurance_current=4,  # weary
+            defence=3,
+            parry_rating=4,
+            battle_stance=BattleStance.DEFENSIVE,
+        )
+        assert c.effective_defence == 10  # 3 + 2*4 - 1
+
 
 # ---------------------------------------------------------------------------
 # BattleStance modifiers (Forward / Open / Defensive / Rearward)
@@ -160,6 +199,15 @@ class TestRollInitiative:
         order = combat_round.roll_initiative(rng)
         assert [x.name for x in order] == ["B"]
 
+    def test_wounded_combatants_excluded(self):
+        a = make_combatant("A")
+        a.take_wound()
+        b = make_combatant("B")
+        rng = SequentialRandom([7])  # only B rolls
+        combat_round = CombatRound(round_number=1, combatants=[a, b])
+        order = combat_round.roll_initiative(rng)
+        assert [x.name for x in order] == ["B"]
+
     def test_ties_preserve_input_order(self):
         a = make_combatant("A")
         b = make_combatant("B")
@@ -208,6 +256,15 @@ class TestCombatRoundResolve:
         outcomes = combat_round.resolve({"Hero": "Orc"}, rng)
         assert outcomes == []
 
+    def test_attack_against_already_wounded_target_is_skipped(self):
+        hero = make_combatant("Hero")
+        orc = make_combatant("Orc")
+        orc.take_wound()
+        rng = SequentialRandom([6])  # only hero (active) rolls initiative
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve({"Hero": "Orc"}, rng)
+        assert outcomes == []
+
     def test_attack_against_unknown_target_name_is_skipped(self):
         hero = make_combatant("Hero")
         rng = SequentialRandom([6])
@@ -234,6 +291,8 @@ class TestCombatRoundResolve:
         assert outcome.result.break_defense_result.outcome == TestOutcome.FAILURE
         assert orc.wounds == 1
         assert orc.endurance_current == 5  # damage still applied
+        assert orc.is_out_of_action is True  # the Wound alone takes Orc out of the fight
+        assert outcome.target_out_of_action is True
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +347,56 @@ class TestCombatRoundBattleStanceWiring:
         defensive_result = attack_open_vs_defensive(BattleStance.DEFENSIVE)
         assert defensive_result.target_number == 9  # 5 + 2*2
         assert defensive_result.outcome == TestOutcome.FAILURE
+
+
+# ---------------------------------------------------------------------------
+# CombatRound.resolve — Wound / Fatigue wiring
+# ---------------------------------------------------------------------------
+
+class TestCombatRoundWoundAndFatigueWiring:
+
+    def test_weary_target_is_easier_to_hit_than_rested_target(self):
+        hero = make_combatant("Hero", ability_level=1, strength_attribute=15)  # TN base=5
+
+        def attack(target_endurance_current):
+            target = make_combatant(
+                "Orc", defence=0, parry_rating=0, endurance_max=10, load=2,
+                endurance_current=target_endurance_current,
+            )
+            rng = SequentialRandom([6, 3, 3, 1])  # initiative, then AD=3 + SD=1 -> total 4
+            combat_round = CombatRound(round_number=1, combatants=[hero, target])
+            return combat_round.resolve({"Hero": "Orc"}, rng)[0].result
+
+        rested_result = attack(target_endurance_current=10)  # not weary
+        assert rested_result.target_number == 5  # 0 + 0 fatigue penalty
+        assert rested_result.outcome == TestOutcome.FAILURE
+
+        weary_result = attack(target_endurance_current=2)  # weary (<= load 2)
+        assert weary_result.target_number == 4  # 0 - 1 fatigue penalty
+        assert weary_result.outcome == TestOutcome.SUCCESS
+
+    def test_weary_attacker_own_hollow_success_dice_are_zeroed(self):
+        hero = make_combatant(
+            "Hero", ability_level=1, strength_attribute=15, endurance_max=10, load=4,
+            endurance_current=4,  # weary
+        )
+        orc = make_combatant("Orc")
+        rng = SequentialRandom([6, 3, 2, 1])  # initiative, then AD=2, SD raw=1 (HOLLOW)
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve({"Hero": "Orc"}, rng)
+
+        result = outcomes[0].result
+        assert result.success_dice[0].value == 0  # HOLLOW zeroed by Weary
+        assert result.total == 2  # AD only; the HOLLOW die contributes nothing
+
+    def test_wounded_combatant_takes_no_further_turns(self):
+        hero = make_combatant("Hero")
+        hero.take_wound()
+        orc = make_combatant("Orc")
+        rng = SequentialRandom([7])  # only Orc (active) rolls initiative
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve({"Hero": "Orc", "Orc": "Hero"}, rng)
+        assert outcomes == []  # Hero never gets to act; Orc has no valid target either
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +524,14 @@ class TestCombatEncounter:
     def test_heroes_win_when_enemies_defeated(self):
         hero = make_combatant("Hero")
         orc = make_combatant("Orc", endurance_current=0)
+        encounter = CombatEncounter(heroes=[hero], enemies=[orc])
+        assert encounter.is_over is True
+        assert encounter.winner == "heroes"
+
+    def test_heroes_win_when_enemies_wounded_despite_remaining_endurance(self):
+        hero = make_combatant("Hero")
+        orc = make_combatant("Orc", endurance_max=10)  # full Endurance, but...
+        orc.take_wound()  # ...incapacitated all the same
         encounter = CombatEncounter(heroes=[hero], enemies=[orc])
         assert encounter.is_over is True
         assert encounter.winner == "heroes"

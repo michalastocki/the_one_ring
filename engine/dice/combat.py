@@ -36,6 +36,11 @@ _BATTLE_STANCE_MODIFIERS: dict[BattleStance, _StanceModifiers] = {
     ),
 }
 
+# Flat Defence penalty applied while Weary, on top of the Weary rule that
+# already zeroes HOLLOW faces on this combatant's own Success Dice
+# (forwarded to CombatTest as is_weary — see resolve_test()).
+_FATIGUE_DEFENCE_PENALTY = 1
+
 
 def _is_in_range(weapon: Weapon, attack_range: RangeBand) -> bool:
     """Whether *weapon* can be used at all at *attack_range*.
@@ -103,7 +108,20 @@ class Combatant:
         This combatant's Parry bonus, counted toward Defence according to
         their current *battle_stance*.
     wounds:
-        Number of Wounds suffered so far.
+        Number of Wounds suffered so far. Any Wound is serious enough to
+        take a combatant out of the fight (see :attr:`is_out_of_action`)
+        until it's treated — this engine doesn't model First Aid, so a
+        wounded Combatant stays out of action for the rest of the Combat.
+
+    Combat effects modeled here
+    ----------------------------
+    Wound:
+        Incapacitates immediately — see :attr:`is_incapacitated`.
+    Fatigue (Weary):
+        Zeroes HOLLOW faces on this combatant's own Success Dice rolls
+        (via *is_weary* forwarded into every CombatTest), and imposes a
+        flat penalty to :attr:`effective_defence` — exhaustion makes you
+        both a worse attacker and an easier target.
     """
 
     name: str
@@ -144,20 +162,38 @@ class Combatant:
         return self.wounds > 0
 
     @property
+    def is_incapacitated(self) -> bool:
+        """True once a Wound has taken this combatant out of the fight.
+
+        A single Wound is serious enough to stop a combatant from fighting
+        on (or being fought on) until it's treated, independent of any
+        Endurance they have left.
+        """
+        return self.is_wounded
+
+    @property
     def is_out_of_action(self) -> bool:
-        """True once Endurance has been reduced to 0 — can't act or be targeted."""
-        return self.endurance_current <= 0
+        """True once Endurance has hit 0 or a Wound has incapacitated this
+        combatant — either way they can't act or be targeted."""
+        return self.endurance_current <= 0 or self.is_incapacitated
 
     @property
     def effective_defence(self) -> int:
-        """Defence rating after the Parry contribution from the current BattleStance.
+        """Defence rating after BattleStance Parry and Fatigue modifiers.
 
         FORWARD drops Parry entirely, OPEN counts it once, DEFENSIVE counts
         it twice, and REARWARD counts it once plus a flat +2 for standing
-        back from the melee.
+        back from the melee. Being Weary then subtracts a further flat
+        penalty on top of whichever stance is active.
         """
         mods = _BATTLE_STANCE_MODIFIERS[self.battle_stance]
-        return self.defence + mods.parry_multiplier * self.parry_rating + mods.defence_bonus
+        fatigue_penalty = _FATIGUE_DEFENCE_PENALTY if self.is_weary else 0
+        return (
+            self.defence
+            + mods.parry_multiplier * self.parry_rating
+            + mods.defence_bonus
+            - fatigue_penalty
+        )
 
     @property
     def attack_bonus_dice(self) -> int:
