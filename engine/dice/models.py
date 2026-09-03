@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Optional
 
 
@@ -44,6 +44,19 @@ class BattleStance(Enum):
     OPEN = "open"            # balanced: no modifier, full Parry
     DEFENSIVE = "defensive"  # cautious: attack penalty, Parry counts twice
     REARWARD = "rearward"    # withdrawn: heavy attack penalty, full Parry + flat bonus
+
+
+class RangeBand(IntEnum):
+    """Distance band between an attacker and their target in a Combat Round.
+
+    An IntEnum so the gap between two bands (e.g. a ranged weapon's
+    optimal band vs. the actual engagement band) is a plain integer
+    difference — see combat.py's range-penalty calculation.
+    """
+
+    SHORT = 0
+    MEDIUM = 1
+    LONG = 2
 
 
 class TestOutcome(Enum):

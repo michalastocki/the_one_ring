@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .action_die import ActionDie
-from .models import BattleStance, Stance, TestOutcome, TestResult
+from .models import BattleStance, RangeBand, Stance, TestOutcome, TestResult
 from .resolver import CombatTest, Weapon
 
 
@@ -35,6 +35,31 @@ _BATTLE_STANCE_MODIFIERS: dict[BattleStance, _StanceModifiers] = {
         attack_dice_modifier=-2, parry_multiplier=1, defence_bonus=2
     ),
 }
+
+
+def _is_in_range(weapon: Weapon, attack_range: RangeBand) -> bool:
+    """Whether *weapon* can be used at all at *attack_range*.
+
+    Ranged weapons can be used at any RangeBand (with a penalty away from
+    their optimal range — see :func:`_range_penalty_dice`). Melee weapons
+    only reach an engaged target, i.e. RangeBand.SHORT.
+    """
+    if weapon.is_ranged:
+        return True
+    return attack_range == RangeBand.SHORT
+
+
+def _range_penalty_dice(weapon: Weapon, attack_range: RangeBand) -> int:
+    """Success Dice penalty for shooting *weapon* away from its optimal band.
+
+    One penalty die per RangeBand step away from ``weapon.optimal_range``
+    (e.g. a bow optimal at MEDIUM shot at LONG loses 1 die, at SHORT also
+    loses 1 die — point-blank shooting is awkward too). Melee weapons and
+    ranged weapons with no declared optimal range take no penalty.
+    """
+    if not weapon.is_ranged or weapon.optimal_range is None:
+        return 0
+    return abs(int(attack_range) - int(weapon.optimal_range))
 
 
 @dataclass
@@ -155,13 +180,18 @@ class Combatant:
 
 @dataclass
 class AttackOutcome:
-    """Result of a single combatant's attack within a Combat Round."""
+    """Result of a single combatant's attack within a Combat Round.
+
+    *result* is None only when *out_of_range* is True — a melee weapon
+    can't reach a target beyond RangeBand.SHORT, so no CombatTest is rolled.
+    """
 
     attacker: str
     target: str
-    result: TestResult
+    result: Optional[TestResult]
     damage_dealt: int = 0
     target_out_of_action: bool = False
+    out_of_range: bool = False
 
 
 @dataclass
@@ -194,7 +224,11 @@ class CombatRound:
         return [c for c, _ in rolled]
 
     def resolve(
-        self, assignments: dict[str, str], rng: random.Random | None = None
+        self,
+        assignments: dict[str, str],
+        rng: random.Random | None = None,
+        *,
+        ranges: Optional[dict[str, RangeBand]] = None,
     ) -> list[AttackOutcome]:
         """Resolve every declared attack for this round, in initiative order.
 
@@ -207,12 +241,18 @@ class CombatRound:
             its turn comes up is skipped (e.g. felled earlier this round).
         rng:
             Optional seeded RNG for deterministic resolution.
+        ranges:
+            Maps attacker name -> RangeBand giving the distance to their
+            declared target this round. A combatant absent from *ranges*
+            is assumed engaged at RangeBand.SHORT. A melee weapon can't
+            reach beyond SHORT — see :attr:`AttackOutcome.out_of_range`.
 
         Returns
         -------
         list[AttackOutcome]
             One entry per attack actually resolved, in initiative order.
         """
+        ranges = ranges or {}
         by_name = {c.name: c for c in self.combatants}
         order = self.roll_initiative(rng)
 
@@ -224,13 +264,27 @@ class CombatRound:
             target = by_name.get(target_name)
             if target is None or attacker.is_out_of_action or target.is_out_of_action:
                 continue
-            outcomes.append(self._resolve_attack(attacker, target, rng))
+            attack_range = ranges.get(attacker.name, RangeBand.SHORT)
+            outcomes.append(self._resolve_attack(attacker, target, attack_range, rng))
         return outcomes
 
     @staticmethod
     def _resolve_attack(
-        attacker: Combatant, target: Combatant, rng: random.Random | None
+        attacker: Combatant,
+        target: Combatant,
+        attack_range: RangeBand,
+        rng: random.Random | None,
     ) -> AttackOutcome:
+        if not _is_in_range(attacker.weapon, attack_range):
+            return AttackOutcome(
+                attacker=attacker.name,
+                target=target.name,
+                result=None,
+                target_out_of_action=target.is_out_of_action,
+                out_of_range=True,
+            )
+
+        range_penalty = _range_penalty_dice(attacker.weapon, attack_range)
         test = CombatTest(
             ability_level=attacker.ability_level,
             attacker_strength_attribute=attacker.strength_attribute,
@@ -242,7 +296,7 @@ class CombatRound:
             is_miserable=attacker.is_miserable,
             is_weary=attacker.is_weary,
             bonus_dice=attacker.attack_bonus_dice,
-            penalty_dice=attacker.attack_penalty_dice,
+            penalty_dice=attacker.attack_penalty_dice + range_penalty,
         )
         result = test.resolve(rng)
 
@@ -312,7 +366,11 @@ class CombatEncounter:
         return all(c.is_out_of_action for c in side)
 
     def run_round(
-        self, assignments: dict[str, str], rng: random.Random | None = None
+        self,
+        assignments: dict[str, str],
+        rng: random.Random | None = None,
+        *,
+        ranges: Optional[dict[str, RangeBand]] = None,
     ) -> list[AttackOutcome]:
         """Play one Combat Round and append it to the encounter history.
 
@@ -331,6 +389,6 @@ class CombatEncounter:
         combat_round = CombatRound(
             round_number=self.round_number, combatants=self.heroes + self.enemies
         )
-        outcomes = combat_round.resolve(assignments, rng)
+        outcomes = combat_round.resolve(assignments, rng, ranges=ranges)
         self.history.append(outcomes)
         return outcomes

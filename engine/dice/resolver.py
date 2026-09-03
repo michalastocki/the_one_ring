@@ -17,6 +17,7 @@ from typing import Optional
 from .models import (
     ActionDieRoll,
     DieResult,
+    RangeBand,
     Stance,
     SuccessDieRoll,
     SuccessQuality,
@@ -313,12 +314,21 @@ class Weapon:
         Category used to determine Tengwar spending effects.
     is_two_handed:
         True for two-handed weapons (grants +1 Strength damage on Mighty Blow).
+    is_ranged:
+        True for a missile weapon (bow, thrown weapon, ...). Melee weapons
+        (the default) can only be used at RangeBand.SHORT — see
+        combat.py's range handling.
+    optimal_range:
+        The RangeBand this weapon is most effective at. Only meaningful
+        when *is_ranged* is True; ignored for melee weapons.
     """
 
     damage: int
     piercing_value: int
     weapon_type: WeaponType = WeaponType.SWORD
     is_two_handed: bool = False
+    is_ranged: bool = False
+    optimal_range: Optional[RangeBand] = None
 
 
 @dataclass
