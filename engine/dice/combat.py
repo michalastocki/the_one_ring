@@ -14,8 +14,27 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .action_die import ActionDie
-from .models import Stance, TestOutcome, TestResult
+from .models import BattleStance, Stance, TestOutcome, TestResult
 from .resolver import CombatTest, Weapon
+
+
+@dataclass(frozen=True)
+class _StanceModifiers:
+    """Numeric effect of one BattleStance."""
+
+    attack_dice_modifier: int  # >0 = bonus Success Dice on own attacks, <0 = penalty dice
+    parry_multiplier: int      # how many times parry_rating counts toward effective Defence
+    defence_bonus: int = 0     # flat Defence bonus on top of the Parry contribution
+
+
+_BATTLE_STANCE_MODIFIERS: dict[BattleStance, _StanceModifiers] = {
+    BattleStance.FORWARD: _StanceModifiers(attack_dice_modifier=1, parry_multiplier=0),
+    BattleStance.OPEN: _StanceModifiers(attack_dice_modifier=0, parry_multiplier=1),
+    BattleStance.DEFENSIVE: _StanceModifiers(attack_dice_modifier=-1, parry_multiplier=2),
+    BattleStance.REARWARD: _StanceModifiers(
+        attack_dice_modifier=-2, parry_multiplier=1, defence_bonus=2
+    ),
+}
 
 
 @dataclass
@@ -36,7 +55,8 @@ class Combatant:
     strength_attribute:
         Governing Strength attribute value (used to derive the attack TN).
     defence:
-        This combatant's Defence rating (added to an attacker's TN).
+        This combatant's base Defence rating, before any Parry contribution
+        from their current BattleStance (see :attr:`effective_defence`).
     armor_rating:
         Number of Success Dice rolled in a Break-Defence sub-test against
         this combatant.
@@ -48,7 +68,15 @@ class Combatant:
     shadow_points:
         Current Shadow score, compared against *hope_current* for Miserable.
     stance:
-        Stance used for this combatant's own attacks.
+        Dice Stance (NORMAL / ENHANCED / WEAKENED) used for this combatant's
+        own attacks. Not to be confused with *battle_stance*.
+    battle_stance:
+        Combat stance (FORWARD / OPEN / DEFENSIVE / REARWARD) held this
+        round; see :attr:`effective_defence` and :attr:`attack_bonus_dice` /
+        :attr:`attack_penalty_dice`.
+    parry_rating:
+        This combatant's Parry bonus, counted toward Defence according to
+        their current *battle_stance*.
     wounds:
         Number of Wounds suffered so far.
     """
@@ -66,6 +94,8 @@ class Combatant:
     hope_current: Optional[int] = None
     shadow_points: int = 0
     stance: Stance = Stance.NORMAL
+    battle_stance: BattleStance = BattleStance.OPEN
+    parry_rating: int = 0
     wounds: int = 0
 
     def __post_init__(self) -> None:
@@ -92,6 +122,27 @@ class Combatant:
     def is_out_of_action(self) -> bool:
         """True once Endurance has been reduced to 0 — can't act or be targeted."""
         return self.endurance_current <= 0
+
+    @property
+    def effective_defence(self) -> int:
+        """Defence rating after the Parry contribution from the current BattleStance.
+
+        FORWARD drops Parry entirely, OPEN counts it once, DEFENSIVE counts
+        it twice, and REARWARD counts it once plus a flat +2 for standing
+        back from the melee.
+        """
+        mods = _BATTLE_STANCE_MODIFIERS[self.battle_stance]
+        return self.defence + mods.parry_multiplier * self.parry_rating + mods.defence_bonus
+
+    @property
+    def attack_bonus_dice(self) -> int:
+        """Extra Success Dice this combatant's own attacks gain from their BattleStance."""
+        return max(0, _BATTLE_STANCE_MODIFIERS[self.battle_stance].attack_dice_modifier)
+
+    @property
+    def attack_penalty_dice(self) -> int:
+        """Success Dice removed from this combatant's own attacks by their BattleStance."""
+        return max(0, -_BATTLE_STANCE_MODIFIERS[self.battle_stance].attack_dice_modifier)
 
     def take_damage(self, amount: int) -> None:
         """Reduce current Endurance by *amount*, floored at 0."""
@@ -183,13 +234,15 @@ class CombatRound:
         test = CombatTest(
             ability_level=attacker.ability_level,
             attacker_strength_attribute=attacker.strength_attribute,
-            target_defence=target.defence,
+            target_defence=target.effective_defence,
             target_armor_rating=target.armor_rating,
             weapon=attacker.weapon,
             attacker_strength_value=attacker.strength_attribute,
             stance=attacker.stance,
             is_miserable=attacker.is_miserable,
             is_weary=attacker.is_weary,
+            bonus_dice=attacker.attack_bonus_dice,
+            penalty_dice=attacker.attack_penalty_dice,
         )
         result = test.resolve(rng)
 

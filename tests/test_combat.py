@@ -3,6 +3,7 @@
 import pytest
 
 from engine.dice import (
+    BattleStance,
     Combatant,
     CombatRound,
     CombatEncounter,
@@ -97,6 +98,42 @@ class TestCombatant:
         c.take_wound()
         assert c.wounds == 1
         assert c.is_wounded is True
+
+
+# ---------------------------------------------------------------------------
+# BattleStance modifiers (Forward / Open / Defensive / Rearward)
+# ---------------------------------------------------------------------------
+
+class TestBattleStanceModifiers:
+
+    def test_forward_grants_bonus_die_and_drops_parry(self):
+        c = make_combatant("Hero", battle_stance=BattleStance.FORWARD, defence=3, parry_rating=4)
+        assert c.attack_bonus_dice == 1
+        assert c.attack_penalty_dice == 0
+        assert c.effective_defence == 3  # parry not counted
+
+    def test_open_is_the_no_modifier_baseline(self):
+        c = make_combatant("Hero", battle_stance=BattleStance.OPEN, defence=3, parry_rating=4)
+        assert c.attack_bonus_dice == 0
+        assert c.attack_penalty_dice == 0
+        assert c.effective_defence == 7  # 3 + 1*4
+
+    def test_defensive_grants_penalty_die_and_doubles_parry(self):
+        c = make_combatant("Hero", battle_stance=BattleStance.DEFENSIVE, defence=3, parry_rating=4)
+        assert c.attack_bonus_dice == 0
+        assert c.attack_penalty_dice == 1
+        assert c.effective_defence == 11  # 3 + 2*4
+
+    def test_rearward_grants_heavy_penalty_and_flat_defence_bonus(self):
+        c = make_combatant("Hero", battle_stance=BattleStance.REARWARD, defence=3, parry_rating=4)
+        assert c.attack_bonus_dice == 0
+        assert c.attack_penalty_dice == 2
+        assert c.effective_defence == 9  # 3 + 1*4 + 2
+
+    def test_default_battle_stance_is_open(self):
+        c = make_combatant("Hero", defence=3, parry_rating=4)
+        assert c.battle_stance == BattleStance.OPEN
+        assert c.effective_defence == 7
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +233,60 @@ class TestCombatRoundResolve:
         assert outcome.result.break_defense_result.outcome == TestOutcome.FAILURE
         assert orc.wounds == 1
         assert orc.endurance_current == 5  # damage still applied
+
+
+# ---------------------------------------------------------------------------
+# CombatRound.resolve — BattleStance wiring
+# ---------------------------------------------------------------------------
+
+class TestCombatRoundBattleStanceWiring:
+
+    def test_forward_attacker_rolls_an_extra_success_die(self):
+        hero = make_combatant(
+            "Hero", ability_level=1, strength_attribute=15, battle_stance=BattleStance.FORWARD
+        )
+        orc = make_combatant("Orc")
+        # initiative: hero=6, orc=3 -> hero first; AD=2, then 2 success dice (1 base + 1 Forward)
+        rng = SequentialRandom([6, 3, 2, 3, 4])
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve({"Hero": "Orc"}, rng)
+
+        result = outcomes[0].result
+        assert len(result.success_dice) == 2
+        assert result.total == 9  # 2 + 3 + 4
+
+    def test_defensive_attacker_rolls_one_fewer_success_die(self):
+        hero = make_combatant(
+            "Hero", ability_level=1, strength_attribute=15, battle_stance=BattleStance.DEFENSIVE
+        )
+        orc = make_combatant("Orc")
+        # initiative: hero=6, orc=3 -> hero first; pool = 1 base - 1 Defensive = 0 success dice
+        rng = SequentialRandom([6, 3, 9])
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve({"Hero": "Orc"}, rng)
+
+        result = outcomes[0].result
+        assert len(result.success_dice) == 0
+        assert result.total == 9
+
+    def test_defensive_target_is_harder_to_hit_than_open_target(self):
+        hero = make_combatant("Hero", ability_level=1, strength_attribute=15)  # TN base=5
+
+        def attack_open_vs_defensive(target_stance):
+            target = make_combatant(
+                "Orc", defence=0, parry_rating=2, battle_stance=target_stance
+            )
+            rng = SequentialRandom([6, 3, 5, 2])  # initiative, then AD=5 + SD=2 -> total 7
+            combat_round = CombatRound(round_number=1, combatants=[hero, target])
+            return combat_round.resolve({"Hero": "Orc"}, rng)[0].result
+
+        open_result = attack_open_vs_defensive(BattleStance.OPEN)
+        assert open_result.target_number == 7  # 5 + 1*2
+        assert open_result.outcome == TestOutcome.SUCCESS
+
+        defensive_result = attack_open_vs_defensive(BattleStance.DEFENSIVE)
+        assert defensive_result.target_number == 9  # 5 + 2*2
+        assert defensive_result.outcome == TestOutcome.FAILURE
 
 
 # ---------------------------------------------------------------------------

@@ -30,6 +30,22 @@ class Stance(Enum):
     WEAKENED = "weakened"    # roll 2 Action Dice, keep the worse
 
 
+class BattleStance(Enum):
+    """The combat stance a Combatant holds for a Combat Round.
+
+    Not to be confused with :class:`Stance` (which governs Action Die
+    variance on a single test). BattleStance trades a combatant's own
+    attack dice against how much of their Parry rating counts toward their
+    Defence while they hold it. See combat.py's stance modifier table for
+    the exact numbers.
+    """
+
+    FORWARD = "forward"      # aggressive: bonus attack die, Parry doesn't count
+    OPEN = "open"            # balanced: no modifier, full Parry
+    DEFENSIVE = "defensive"  # cautious: attack penalty, Parry counts twice
+    REARWARD = "rearward"    # withdrawn: heavy attack penalty, full Parry + flat bonus
+
+
 class TestOutcome(Enum):
     """High-level outcome of a resolved test."""
 
