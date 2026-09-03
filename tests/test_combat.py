@@ -164,10 +164,10 @@ class TestBattleStanceModifiers:
         assert c.attack_penalty_dice == 1
         assert c.effective_defence == 11  # 3 + 2*4
 
-    def test_rearward_grants_heavy_penalty_and_flat_defence_bonus(self):
+    def test_rearward_grants_attack_penalty_and_flat_defence_bonus(self):
         c = make_combatant("Hero", battle_stance=BattleStance.REARWARD, defence=3, parry_rating=4)
         assert c.attack_bonus_dice == 0
-        assert c.attack_penalty_dice == 2
+        assert c.attack_penalty_dice == 1
         assert c.effective_defence == 9  # 3 + 1*4 + 2
 
     def test_default_battle_stance_is_open(self):
@@ -444,8 +444,12 @@ class TestCombatRoundRangeWiring:
 
     def test_ranged_weapon_at_optimal_range_has_no_penalty(self):
         bow = Weapon(damage=5, piercing_value=10, is_ranged=True, optimal_range=RangeBand.MEDIUM)
-        hero = make_combatant("Hero", ability_level=1, strength_attribute=15, weapon=bow)
+        hero = make_combatant(
+            "Hero", ability_level=2, strength_attribute=15, weapon=bow,
+            battle_stance=BattleStance.REARWARD,
+        )
         orc = make_combatant("Orc")
+        # pool = 2 base - 1 REARWARD penalty - 0 range penalty (at optimal) = 1 success die
         rng = SequentialRandom([6, 3, 2, 3])  # initiative, AD=2, one success die SD=3
         combat_round = CombatRound(round_number=1, combatants=[hero, orc])
         outcomes = combat_round.resolve(
@@ -458,9 +462,12 @@ class TestCombatRoundRangeWiring:
 
     def test_ranged_weapon_one_band_off_optimal_loses_a_die(self):
         bow = Weapon(damage=5, piercing_value=10, is_ranged=True, optimal_range=RangeBand.MEDIUM)
-        hero = make_combatant("Hero", ability_level=1, strength_attribute=15, weapon=bow)
+        hero = make_combatant(
+            "Hero", ability_level=2, strength_attribute=15, weapon=bow,
+            battle_stance=BattleStance.REARWARD,
+        )
         orc = make_combatant("Orc")
-        # 1 base die - 1 range penalty (SHORT is one band off MEDIUM) = 0 success dice
+        # pool = 2 base - 1 REARWARD penalty - 1 range penalty (SHORT is one band off MEDIUM) = 0
         rng = SequentialRandom([6, 3, 9])
         combat_round = CombatRound(round_number=1, combatants=[hero, orc])
         outcomes = combat_round.resolve(
@@ -473,22 +480,28 @@ class TestCombatRoundRangeWiring:
 
     def test_ranged_weapon_two_bands_off_optimal_loses_two_dice(self):
         bow = Weapon(damage=5, piercing_value=10, is_ranged=True, optimal_range=RangeBand.SHORT)
-        hero = make_combatant("Hero", ability_level=2, strength_attribute=15, weapon=bow)
+        hero = make_combatant(
+            "Hero", ability_level=4, strength_attribute=15, weapon=bow,
+            battle_stance=BattleStance.REARWARD,
+        )
         orc = make_combatant("Orc")
-        # 2 base dice - 2 range penalty (LONG is two bands off SHORT) = 0 success dice
-        rng = SequentialRandom([6, 3, 7])
+        # pool = 4 base - 1 REARWARD penalty - 2 range penalty (LONG is two bands off SHORT) = 1
+        rng = SequentialRandom([6, 3, 7, 5])  # initiative, AD=7, one success die SD=5
         combat_round = CombatRound(round_number=1, combatants=[hero, orc])
         outcomes = combat_round.resolve(
             {"Hero": "Orc"}, rng, ranges={"Hero": RangeBand.LONG}
         )
 
         result = outcomes[0].result
-        assert len(result.success_dice) == 0
-        assert result.total == 7
+        assert len(result.success_dice) == 1
+        assert result.total == 12  # 7 + 5
 
     def test_ranged_weapon_can_attack_at_any_range(self):
         bow = Weapon(damage=5, piercing_value=10, is_ranged=True, optimal_range=RangeBand.LONG)
-        hero = make_combatant("Hero", ability_level=0, strength_attribute=15, weapon=bow)
+        hero = make_combatant(
+            "Hero", ability_level=0, strength_attribute=15, weapon=bow,
+            battle_stance=BattleStance.REARWARD,
+        )
         orc = make_combatant("Orc")
         rng = SequentialRandom([6, 3, 8])
         combat_round = CombatRound(round_number=1, combatants=[hero, orc])
@@ -496,6 +509,79 @@ class TestCombatRoundRangeWiring:
             {"Hero": "Orc"}, rng, ranges={"Hero": RangeBand.SHORT}
         )
         assert outcomes[0].out_of_range is False
+        assert outcomes[0].wrong_stance is False
+        assert outcomes[0].result is not None
+
+
+# ---------------------------------------------------------------------------
+# CombatRound.resolve — REARWARD gating (ranged weapons + melee protection)
+# ---------------------------------------------------------------------------
+
+class TestCombatRoundRearwardGating:
+
+    def test_ranged_weapon_outside_rearward_cannot_fire(self):
+        bow = Weapon(damage=5, piercing_value=10, is_ranged=True, optimal_range=RangeBand.MEDIUM)
+        hero = make_combatant(
+            "Hero", ability_level=2, strength_attribute=15, weapon=bow,
+            battle_stance=BattleStance.OPEN,  # not REARWARD
+        )
+        orc = make_combatant("Orc", endurance_max=10)
+        rng = SequentialRandom([6, 3])  # initiative only; no attack die is rolled
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve(
+            {"Hero": "Orc"}, rng, ranges={"Hero": RangeBand.MEDIUM}
+        )
+
+        outcome = outcomes[0]
+        assert outcome.wrong_stance is True
+        assert outcome.result is None
+        assert outcome.damage_dealt == 0
+        assert orc.endurance_current == 10  # untouched
+
+    def test_melee_weapon_ignores_the_rearward_requirement(self):
+        hero = make_combatant(
+            "Hero", ability_level=0, strength_attribute=15, battle_stance=BattleStance.FORWARD
+        )
+        orc = make_combatant("Orc")
+        rng = SequentialRandom([6, 3, 8])
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve(
+            {"Hero": "Orc"}, rng, ranges={"Hero": RangeBand.SHORT}
+        )
+        assert outcomes[0].wrong_stance is False
+        assert outcomes[0].result is not None
+
+    def test_rearward_target_cannot_be_reached_by_melee(self):
+        hero = make_combatant("Hero", ability_level=2, strength_attribute=15)  # melee weapon
+        orc = make_combatant("Orc", endurance_max=10, battle_stance=BattleStance.REARWARD)
+        rng = SequentialRandom([6, 3])  # initiative only; no attack die is rolled
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve(
+            {"Hero": "Orc"}, rng, ranges={"Hero": RangeBand.SHORT}
+        )
+
+        outcome = outcomes[0]
+        assert outcome.target_protected is True
+        assert outcome.result is None
+        assert outcome.damage_dealt == 0
+        assert orc.endurance_current == 10  # untouched
+
+    def test_rearward_target_can_still_be_shot(self):
+        bow = Weapon(damage=5, piercing_value=10, is_ranged=True, optimal_range=RangeBand.SHORT)
+        hero = make_combatant(
+            "Hero", ability_level=2, strength_attribute=15, weapon=bow,
+            battle_stance=BattleStance.REARWARD,
+        )
+        orc = make_combatant("Orc", battle_stance=BattleStance.REARWARD)
+        rng = SequentialRandom([6, 3, 8, 4])  # initiative, AD=8, one success die SD=4
+        combat_round = CombatRound(round_number=1, combatants=[hero, orc])
+        outcomes = combat_round.resolve(
+            {"Hero": "Orc"}, rng, ranges={"Hero": RangeBand.SHORT}
+        )
+
+        outcome = outcomes[0]
+        assert outcome.target_protected is False
+        assert outcome.result is not None
 
 
 # ---------------------------------------------------------------------------

@@ -38,12 +38,22 @@ class BattleStance(Enum):
     attack dice against how much of their Parry rating counts toward their
     Defence while they hold it. See combat.py's stance modifier table for
     the exact numbers.
+
+    REARWARD is also the only stance that permits firing a ranged weapon,
+    and it protects the holder from melee attacks — only another ranged
+    weapon can target them while they hold it (see combat.py's
+    ``_can_fire`` / ``_is_valid_target``). The tabletop rule that lets an
+    attacker spend a Hate point to bypass that protection isn't modeled
+    here, nor is the precondition for choosing REARWARD in the first
+    place (needing allies already engaged in melee, or outnumbering the
+    foe).
     """
 
     FORWARD = "forward"      # aggressive: bonus attack die, Parry doesn't count
     OPEN = "open"            # balanced: no modifier, full Parry
     DEFENSIVE = "defensive"  # cautious: attack penalty, Parry counts twice
-    REARWARD = "rearward"    # withdrawn: heavy attack penalty, full Parry + flat bonus
+    REARWARD = "rearward"    # ranged-only: attack penalty, full Parry + flat bonus,
+                              # required to fire a ranged weapon, protects from melee
 
 
 class RangeBand(IntEnum):

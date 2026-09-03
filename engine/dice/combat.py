@@ -32,7 +32,7 @@ _BATTLE_STANCE_MODIFIERS: dict[BattleStance, _StanceModifiers] = {
     BattleStance.OPEN: _StanceModifiers(attack_dice_modifier=0, parry_multiplier=1),
     BattleStance.DEFENSIVE: _StanceModifiers(attack_dice_modifier=-1, parry_multiplier=2),
     BattleStance.REARWARD: _StanceModifiers(
-        attack_dice_modifier=-2, parry_multiplier=1, defence_bonus=2
+        attack_dice_modifier=-1, parry_multiplier=1, defence_bonus=2
     ),
 }
 
@@ -65,6 +65,34 @@ def _range_penalty_dice(weapon: Weapon, attack_range: RangeBand) -> int:
     if not weapon.is_ranged or weapon.optimal_range is None:
         return 0
     return abs(int(attack_range) - int(weapon.optimal_range))
+
+
+def _can_fire(attacker: Combatant) -> bool:
+    """Whether *attacker* is allowed to use their weapon at all this attack.
+
+    A ranged weapon can only be fired from REARWARD stance — Rearward is
+    reserved for making ranged attacks. Melee weapons have no such
+    restriction (their reach is governed by RangeBand instead, in
+    :func:`_is_in_range`).
+    """
+    if not attacker.weapon.is_ranged:
+        return True
+    return attacker.battle_stance == BattleStance.REARWARD
+
+
+def _is_valid_target(attacker: Combatant, target: Combatant) -> bool:
+    """Whether *attacker* is allowed to target *target* at all this attack.
+
+    A combatant holding REARWARD stance is pulled back and covered by
+    their allies — only a ranged weapon can reach them; melee attackers
+    cannot target them regardless of declared RangeBand. (The tabletop
+    rule lets an attacker spend a Hate point to ignore this protection;
+    this engine doesn't model a Hate resource, so that override isn't
+    available here.)
+    """
+    if target.battle_stance == BattleStance.REARWARD:
+        return attacker.weapon.is_ranged
+    return True
 
 
 @dataclass
@@ -103,7 +131,9 @@ class Combatant:
     battle_stance:
         Combat stance (FORWARD / OPEN / DEFENSIVE / REARWARD) held this
         round; see :attr:`effective_defence` and :attr:`attack_bonus_dice` /
-        :attr:`attack_penalty_dice`.
+        :attr:`attack_penalty_dice`. A ranged weapon can only be fired
+        while holding REARWARD, and REARWARD in turn can only be reached
+        by another ranged attack — see CombatRound._resolve_attack.
     parry_rating:
         This combatant's Parry bonus, counted toward Defence according to
         their current *battle_stance*.
@@ -218,8 +248,14 @@ class Combatant:
 class AttackOutcome:
     """Result of a single combatant's attack within a Combat Round.
 
-    *result* is None only when *out_of_range* is True — a melee weapon
-    can't reach a target beyond RangeBand.SHORT, so no CombatTest is rolled.
+    *result* is None whenever the attack couldn't be made at all — no
+    CombatTest is rolled in that case. Exactly one of *out_of_range*,
+    *wrong_stance*, or *target_protected* is True when that happens:
+
+    - out_of_range: a melee weapon can't reach beyond RangeBand.SHORT.
+    - wrong_stance: a ranged weapon was used outside REARWARD stance.
+    - target_protected: the target holds REARWARD stance and this
+      attacker's weapon isn't ranged, so it can't reach them.
     """
 
     attacker: str
@@ -228,6 +264,8 @@ class AttackOutcome:
     damage_dealt: int = 0
     target_out_of_action: bool = False
     out_of_range: bool = False
+    wrong_stance: bool = False
+    target_protected: bool = False
 
 
 @dataclass
@@ -311,6 +349,24 @@ class CombatRound:
         attack_range: RangeBand,
         rng: random.Random | None,
     ) -> AttackOutcome:
+        if not _can_fire(attacker):
+            return AttackOutcome(
+                attacker=attacker.name,
+                target=target.name,
+                result=None,
+                target_out_of_action=target.is_out_of_action,
+                wrong_stance=True,
+            )
+
+        if not _is_valid_target(attacker, target):
+            return AttackOutcome(
+                attacker=attacker.name,
+                target=target.name,
+                result=None,
+                target_out_of_action=target.is_out_of_action,
+                target_protected=True,
+            )
+
         if not _is_in_range(attacker.weapon, attack_range):
             return AttackOutcome(
                 attacker=attacker.name,
