@@ -215,3 +215,44 @@ class TestRowsFromJson:
             )
         assert excinfo.value.pointer == "/rows/1"
         assert excinfo.value.entity_id == "t"
+
+
+class TestTableRowPrimitive:
+    """`matches` is the primitive the three resolution groups share."""
+
+    @pytest.mark.parametrize("match", [7, (1, 10)])
+    def test_a_numeric_row_never_claims_an_icon_key(self, match: int | tuple[int, int]) -> None:
+        # Coverage validation means an icon key always finds its icon row first, so this
+        # guard is unreachable through lookup(). It is still what makes that guarantee
+        # safe, so assert it directly.
+        row: TableRow[str] = TableRow(match, "x")
+        assert not row.matches(FeatFace.EYE)
+        assert not row.matches(FeatFace.RUNE)
+
+    def test_an_icon_row_claims_only_its_own_face(self) -> None:
+        row: TableRow[str] = TableRow(FeatFace.EYE, "x")
+        assert row.matches(FeatFace.EYE)
+        assert not row.matches(FeatFace.RUNE)
+        assert not row.matches(5)
+
+
+class TestRerollGuards:
+    def test_a_non_array_reroll_is_rejected(self) -> None:
+        table: LookupTable[object] = LookupTable(
+            id="bad",
+            die=DieKind.SUCCESS,
+            rows=(TableRow((1, 6), {"reroll": "not an array"}),),
+        )
+        with pytest.raises(ContentError, match="must be an array"):
+            table.resolve(ScriptedRandomness(successes=[1]))
+
+    def test_a_self_referential_chain_is_cut_off(self) -> None:
+        # A row whose reroll leads to another reroll, forever. Without the depth guard
+        # this recurses until the interpreter gives up.
+        endless: dict[str, object] = {}
+        endless["reroll"] = [{"match": [1, 6], "value": endless}]
+        table: LookupTable[object] = LookupTable(
+            id="endless", die=DieKind.SUCCESS, rows=(TableRow((1, 6), endless),)
+        )
+        with pytest.raises(ContentError, match="self-referential"):
+            table.resolve(ScriptedRandomness(successes=[1] * 20))
