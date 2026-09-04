@@ -1,0 +1,7 @@
+{"id": "hoards", "die": "success",
+ "comment": "Grade is chosen by the Loremaster; this table converts a die to a value band.",
+ "rows": [
+   {"match": [1, 2], "value": {"band": "meagre"}},
+   {"match": [3, 4], "value": {"band": "fair"}},
+   {"match": [5, 6], "value": {"band": "rich"}}
+ ]}

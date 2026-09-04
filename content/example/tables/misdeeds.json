@@ -1,0 +1,9 @@
+{"id": "misdeeds", "die": "success",
+ "comment": "11.4.4 — Misdeeds are never resistible; the table grades the points only.",
+ "rows": [
+   {"match": 1, "value": {"points": 1, "scar": false}},
+   {"match": 2, "value": {"points": 2, "scar": false}},
+   {"match": [3, 4], "value": {"points": 3, "scar": false}},
+   {"match": 5, "value": {"points": 4, "scar": false}},
+   {"match": 6, "value": {"points": 4, "scar": true}}
+ ]}

@@ -1,0 +1,12 @@
+{"id": "hunt", "die": "success",
+ "comment": "14.4 — a Revelation episode drawn when the Company is revealed.",
+ "rows": [
+   {"match": [1, 2], "value": {"episode": "example_complication", "ops": []}},
+   {"match": [3, 4], "value": {"episode": "example_weariness",
+                               "ops": [{"op": "condition", "who": "company",
+                                        "condition": "weary", "value": true}]}},
+   {"match": 5, "value": {"episode": "example_greed",
+                          "ops": [{"op": "shadow", "who": "chosen", "points": 3, "source": "greed"}]}},
+   {"match": 6, "value": {"episode": "example_stiffened_council",
+                          "ops": [{"op": "council_resistance_step", "steps": 1}]}}
+ ]}

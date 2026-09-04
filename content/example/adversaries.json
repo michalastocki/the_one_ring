@@ -1,0 +1,84 @@
+{"adversaries": [
+  {
+    "id": "example_minion",
+    "name": "Example Minion",
+    "creature_types": ["orcs"],
+    "size": "human",
+    "attribute_level": 4,
+    "endurance": 16,
+    "might": 1,
+    "drive": {"kind": "hate", "value": 4},
+    "parry": 2,
+    "armour": 3,
+    "icon_inverted": true,
+    "attacks": [
+      {"name": "Example Blade", "rating": 3, "damage": 3, "injury": 16,
+       "special_damage": ["break_shield"], "ranged": false},
+      {"name": "Example Sling", "rating": 2, "damage": 3, "injury": 14,
+       "special_damage": ["pierce"], "ranged": true}
+    ],
+    "always_available_special_damage": [],
+    "fell_abilities": ["denizen_of_the_dark"],
+    "distinctive_features": ["cunning", "wary"]
+  },
+  {
+    "id": "example_brute",
+    "name": "Example Brute",
+    "creature_types": ["trolls"],
+    "size": "large",
+    "attribute_level": 7,
+    "endurance": 40,
+    "might": 2,
+    "drive": {"kind": "hate", "value": 6},
+    "parry": 3,
+    "armour": 5,
+    "icon_inverted": true,
+    "attacks": [
+      {"name": "Example Cudgel", "rating": 4, "damage": 8, "injury": 20,
+       "special_damage": ["seize"], "ranged": false}
+    ],
+    "always_available_special_damage": ["pierce"],
+    "fell_abilities": ["hideous_toughness", "strike_fear"],
+    "distinctive_features": ["wilful"]
+  },
+  {
+    "id": "example_ruffian",
+    "name": "Example Ruffian",
+    "creature_types": ["evil_men"],
+    "size": "human",
+    "attribute_level": 3,
+    "endurance": 14,
+    "might": 1,
+    "drive": {"kind": "resolve", "value": 3},
+    "parry": 2,
+    "armour": 2,
+    "icon_inverted": false,
+    "attacks": [
+      {"name": "Example Spear", "rating": 2, "damage": 4, "injury": 14,
+       "special_damage": [], "ranged": false}
+    ],
+    "always_available_special_damage": [],
+    "fell_abilities": [],
+    "distinctive_features": ["bold"]
+  },
+  {
+    "id": "example_lurker",
+    "name": "Example Lurker",
+    "creature_types": ["spiders"],
+    "size": "human",
+    "attribute_level": 5,
+    "endurance": 20,
+    "might": 1,
+    "drive": {"kind": "hate", "value": 5},
+    "parry": 4,
+    "armour": 2,
+    "icon_inverted": true,
+    "attacks": [
+      {"name": "Example Bite", "rating": 3, "damage": 4, "injury": 18,
+       "special_damage": ["pierce"], "ranged": false}
+    ],
+    "always_available_special_damage": [],
+    "fell_abilities": ["snake_like_speed", "hatred"],
+    "distinctive_features": ["wary"]
+  }
+]}

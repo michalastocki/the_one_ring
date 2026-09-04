@@ -1,0 +1,11 @@
+{"id": "precious_objects", "die": "success",
+ "comment": "Exercises the reroll chain of 13.6: a material row that chains into a second roll.",
+ "rows": [
+   {"match": [1, 2], "value": "example_gold"},
+   {"match": [3, 4], "value": "example_silver"},
+   {"match": 5, "value": {"reroll": [
+      {"match": [1, 2], "value": "example_adamant"},
+      {"match": [3, 4], "value": "example_white_gem"},
+      {"match": [5, 6], "value": "example_clear_crystal"}]}},
+   {"match": 6, "value": "example_ivory"}
+ ]}

@@ -1,0 +1,10 @@
+{"id": "blessings", "die": "success",
+ "comment": "13.5 — the first die picks the Skill group, in the 20.1 order.",
+ "rows": [
+   {"match": 1, "value": {"group": "personality", "object_suggestions": ["a ring", "a circlet"]}},
+   {"match": 2, "value": {"group": "movement", "object_suggestions": ["boots", "a cloak"]}},
+   {"match": 3, "value": {"group": "perception", "object_suggestions": ["a mirror", "a seeing-stone"]}},
+   {"match": 4, "value": {"group": "survival", "object_suggestions": ["a coil of rope", "a horn"]}},
+   {"match": 5, "value": {"group": "custom", "object_suggestions": ["an instrument"]}},
+   {"match": 6, "value": {"group": "vocation", "object_suggestions": ["a staff", "a book"]}}
+ ]}

@@ -1,0 +1,23 @@
+{"fell_abilities": [
+  {"id": "snake_like_speed", "name": "Snake-like Speed",
+   "factory": "spend_drive_for",
+   "params": {"cost": 1, "trigger": "targeted_by_attack",
+              "grant": {"hook": "MODIFY_ROLL_REQUEST", "ill_favoured": true}}},
+
+  {"id": "strike_fear", "name": "Strike Fear",
+   "factory": "shadow_on_hit",
+   "params": {"points": 3, "source": "dread", "on_fail": "cannot_spend_hope"}},
+
+  {"id": "denizen_of_the_dark", "name": "Denizen of the Dark",
+   "factory": "favour_rolls",
+   "params": {"purpose": "attack", "predicate": {"in_darkness": true}}},
+
+  {"id": "hatred", "name": "Hatred",
+   "factory": "favour_rolls", "requires_choice": {"subject": 1},
+   "params": {"purpose": "attack"}},
+
+  {"id": "hideous_toughness", "name": "Hideous Toughness",
+   "factory": "spend_drive_for",
+   "params": {"hook": "DAMAGE_INTERCEPT", "cost": 0, "trigger": "would_reach_zero",
+              "grant": {"piercing_blow": true, "restore_full_endurance": true}}}
+]}

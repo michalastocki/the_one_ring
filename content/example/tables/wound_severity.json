@@ -1,0 +1,6 @@
+{"id": "wound_severity", "die": "feat",
+ "rows": [
+   {"match": "rune",  "value": {"severity": "moderate"}},
+   {"match": [1, 10], "value": {"severity": "severe", "days": "$roll"}},
+   {"match": "eye",   "value": {"severity": "grievous"}}
+ ]}

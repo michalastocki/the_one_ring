@@ -1,0 +1,6 @@
+{"id": "magical_treasure", "die": "success",
+ "rows": [
+   {"match": [1, 3], "value": {"kind": "artefact", "blessings": 1, "shadow_on_eye": 1}},
+   {"match": [4, 5], "value": {"kind": "wondrous", "blessings": 2, "shadow_on_eye": 2}},
+   {"match": 6,      "value": {"kind": "famous_gear", "blessings": 0, "shadow_on_eye": 3}}
+ ]}

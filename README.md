@@ -49,9 +49,15 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–6 of the order in `00-README.md` §5: `tor.dice`, `tor.tables`, `tor.rolls`,
-`tor.model`, `tor.effects`, `tor.content`. The rules subsystems, session layer, and CLI
-are not yet implemented.
+Build steps 1–6 of the order in `00-README.md` §5 are complete: `tor.dice`, `tor.tables`,
+`tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, plus `content/example/`. That is
+the pure core and all three seams; the rules subsystems (steps 7–15), the session layer,
+and the API and CLI are not yet implemented.
+
+One deliberate deviation from the spec is recorded in `tor/rolls.py`: `01.1` lists
+`tor.rolls`, `tor.effects` and `tor.tables` as independent siblings, while `02.3.1` puts
+`build_request` in `tor.rolls` and has it read the `EffectBus`. Both cannot hold, so
+`tor.rolls` sits one layer above `tor.effects` and the import contract says so.
 
 ## Development
 

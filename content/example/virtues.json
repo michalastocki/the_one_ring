@@ -1,0 +1,25 @@
+{"virtues": [
+  {"id": "hardiness", "name": "Hardiness", "repeatable": true,
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_MAX_ENDURANCE", "delta": 2}},
+
+  {"id": "confidence", "name": "Confidence", "repeatable": true,
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_MAX_HOPE", "delta": 2}},
+
+  {"id": "nimbleness", "name": "Nimbleness", "repeatable": true,
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_PARRY", "delta": 1}},
+
+  {"id": "prowess", "name": "Prowess", "repeatable": true,
+   "factory": "numeric_modifier", "requires_choice": {"attribute": 1},
+   "params": {"hook": "MODIFY_ATTRIBUTE_TN", "delta": -1}},
+
+  {"id": "mastery", "name": "Mastery", "repeatable": true,
+   "factory": "make_favoured", "requires_choice": {"skills": 2},
+   "params": {"skills": []}},
+
+  {"id": "dour_handed", "name": "Dour-handed", "repeatable": true,
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_SPECIAL_DAMAGE", "delta": 1}}
+]}

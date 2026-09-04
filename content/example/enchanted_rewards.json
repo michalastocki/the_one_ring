@@ -1,0 +1,32 @@
+{"enchanted_rewards": [
+  {"id": "ancient_close_fitting", "name": "Ancient Close Fitting",
+   "craftsmanship": ["elven", "dwarven", "numenorean"],
+   "item_types": ["armour", "helm"], "requires_bane": false,
+   "supersedes": "close_fitting",
+   "factory": "greater_of",
+   "params": {"hook": "MODIFY_PROTECTION_ROLL", "flat": 3, "stat": "valour"}},
+
+  {"id": "mithril_make", "name": "Mithril Make",
+   "craftsmanship": ["dwarven"],
+   "item_types": ["armour", "helm", "shield"], "requires_bane": false,
+   "supersedes": "cunning_make",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_ITEM_LOAD", "delta": -4}},
+
+  {"id": "superior_keen", "name": "Superior Keen",
+   "craftsmanship": ["elven", "numenorean"],
+   "item_types": ["weapon"], "requires_bane": true,
+   "supersedes": "keen",
+   "factory": "modify_piercing_threshold", "params": {"minus_stat": "valour"}},
+
+  {"id": "gleam_of_wrath", "name": "Gleam of Wrath",
+   "craftsmanship": ["elven"],
+   "item_types": ["weapon"], "requires_bane": true,
+   "factory": "drain_drive_on_hit", "params": {"amount": 1, "per_icon": 1}},
+
+  {"id": "flame_of_hope", "name": "Flame of Hope",
+   "craftsmanship": ["numenorean"],
+   "item_types": ["weapon"], "requires_bane": false,
+   "factory": "shadow_on_hit",
+   "params": {"points": 2, "source": "dread", "on_fail": "cannot_spend_hope"}}
+]}

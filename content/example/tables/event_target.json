@@ -1,0 +1,6 @@
+{"id": "event_target", "die": "success",
+ "rows": [
+   {"match": [1, 2], "value": {"role": "scout", "skill": "explore"}},
+   {"match": [3, 4], "value": {"role": "lookout", "skill": "awareness"}},
+   {"match": [5, 6], "value": {"role": "hunter", "skill": "hunting"}}
+ ]}

@@ -1,0 +1,17 @@
+{"distinctive_features": [
+  {"id": "bold", "name": "Bold", "factory": "grant_inspiration"},
+  {"id": "eager", "name": "Eager", "factory": "grant_inspiration"},
+  {"id": "fair", "name": "Fair", "factory": "grant_inspiration"},
+  {"id": "wilful", "name": "Wilful", "factory": "grant_inspiration"},
+  {"id": "cunning", "name": "Cunning", "factory": "grant_inspiration"},
+  {"id": "merry", "name": "Merry", "factory": "grant_inspiration"},
+  {"id": "wary", "name": "Wary", "factory": "grant_inspiration"},
+  {"id": "steadfast", "name": "Steadfast", "factory": "grant_inspiration"},
+
+  {"id": "enemy_lore", "name": "Enemy-lore", "factory": "favour_rolls",
+   "requires_choice": {"subject": 1},
+   "params": {"purpose": "attack"}},
+
+  {"id": "dark_sighted", "name": "Dark-sighted", "factory": "grant_inspiration",
+   "params": {"predicate": {"in_darkness": true}}}
+]}

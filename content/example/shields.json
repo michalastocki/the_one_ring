@@ -1,0 +1,6 @@
+{"shields": [
+  {"id": "example_buckler", "name": "Example Buckler", "parry_bonus": 1, "load": 1,
+   "min_standard_of_living": null},
+  {"id": "example_great_shield", "name": "Example Great Shield", "parry_bonus": 3, "load": 6,
+   "min_standard_of_living": "prosperous"}
+]}

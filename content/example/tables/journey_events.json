@@ -1,0 +1,21 @@
+{"id": "journey_events", "die": "feat",
+ "rows": [
+  {"match": "eye",  "value": {"event": "terrible_misfortune", "fatigue": 3,
+                              "on_failure": [{"op": "wound", "who": "target"}]}},
+  {"match": 1,      "value": {"event": "despair", "fatigue": 2,
+                              "on_failure": [{"op": "shadow", "who": "company",
+                                              "points": 1, "source": "dread"}]}},
+  {"match": [2, 3], "value": {"event": "ill_choices", "fatigue": 2,
+                              "on_failure": [{"op": "shadow", "who": "target",
+                                              "points": 1, "source": "dread"}]}},
+  {"match": [4, 7], "value": {"event": "mishap", "fatigue": 2,
+                              "on_failure": [{"op": "journey_days", "delta": 1},
+                                             {"op": "fatigue", "who": "target", "points": 1}]}},
+  {"match": [8, 9], "value": {"event": "short_cut", "fatigue": 1,
+                              "on_success": [{"op": "journey_days", "delta": -1}]}},
+  {"match": 10,     "value": {"event": "chance_meeting", "fatigue": 1,
+                              "on_success": [{"op": "suppress_fatigue"},
+                                             {"op": "narrative", "tag": "favourable_encounter"}]}},
+  {"match": "rune", "value": {"event": "joyful_sight", "fatigue": 0,
+                              "on_success": [{"op": "hope", "who": "company", "points": 1}]}}
+ ]}
