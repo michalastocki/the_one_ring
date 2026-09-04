@@ -1,0 +1,12 @@
+{"undertakings": [
+  {"id": "gather_rumours", "name": "Gather Rumours", "yule_only": false},
+  {"id": "heal_scars", "name": "Heal Scars", "yule_only": true},
+  {"id": "meet_patron", "name": "Meet Patron", "yule_only": false},
+  {"id": "ponder_maps", "name": "Ponder Storied and Figured Maps", "yule_only": false},
+  {"id": "raise_an_heir", "name": "Raise an Heir", "yule_only": true},
+  {"id": "recount_a_story", "name": "Recount a Story", "yule_only": true},
+  {"id": "strengthen_fellowship", "name": "Strengthen Fellowship", "yule_only": false},
+  {"id": "study_magical_items", "name": "Study Magical Items", "yule_only": false},
+  {"id": "write_a_song", "name": "Write a Song", "yule_only": false},
+  {"id": "visit_treasury", "name": "Visit the Treasury", "yule_only": false}
+]}

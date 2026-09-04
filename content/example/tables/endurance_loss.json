@@ -1,0 +1,6 @@
+{"id": "endurance_loss", "die": "feat",
+ "rows": [
+   {"match": "rune",  "value": {"kind": "unscathed", "loss": 0}},
+   {"match": [1, 10], "value": {"kind": "bruised", "loss": "$roll"}},
+   {"match": "eye",   "value": {"kind": "knocked_out", "loss": "all"}}
+ ]}

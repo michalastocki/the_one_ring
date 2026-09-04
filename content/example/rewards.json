@@ -1,0 +1,24 @@
+{"rewards": [
+  {"id": "close_fitting", "name": "Close-fitting", "applies_to": ["armour", "helm"],
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_PROTECTION_ROLL", "delta": 2}},
+
+  {"id": "cunning_make", "name": "Cunning Make", "applies_to": ["armour", "helm", "shield"],
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_ITEM_LOAD", "delta": -2}},
+
+  {"id": "fell", "name": "Fell", "applies_to": ["weapon"],
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_INJURY_RATING", "delta": 2, "all_modes": true}},
+
+  {"id": "grievous", "name": "Grievous", "applies_to": ["weapon"],
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_DAMAGE_RATING", "delta": 1}},
+
+  {"id": "keen", "name": "Keen", "applies_to": ["weapon"],
+   "factory": "modify_piercing_threshold", "params": {"threshold": 9}},
+
+  {"id": "reinforced", "name": "Reinforced", "applies_to": ["shield"],
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_SHIELD_PARRY", "delta": 1}}
+]}

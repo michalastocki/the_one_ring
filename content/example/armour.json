@@ -1,0 +1,10 @@
+{"armour": [
+  {"id": "example_leather", "name": "Example Leather", "protection": 1, "load": 4,
+   "category": "leather", "min_standard_of_living": null},
+  {"id": "example_mail", "name": "Example Mail", "protection": 3, "load": 9,
+   "category": "mail", "min_standard_of_living": "common"}
+ ],
+ "helms": [
+  {"id": "example_helm", "name": "Example Helm", "protection": 1, "load": 4,
+   "category": "headgear", "removable_in_combat": true, "min_standard_of_living": null}
+ ]}

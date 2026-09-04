@@ -1,0 +1,14 @@
+{"callings": [
+  {"id": "example_calling", "name": "Example Calling",
+   "favoured_skill_choices": ["battle", "enhearten", "persuade"],
+   "favoured_skill_count": 2,
+   "distinctive_feature": {"effect": "steadfast", "requires_subject": false},
+   "shadow_path": "example_path",
+   "free_undertaking": "strengthen_fellowship"},
+  {"id": "second_calling", "name": "Second Calling",
+   "favoured_skill_choices": ["lore", "riddle", "scan"],
+   "favoured_skill_count": 2,
+   "distinctive_feature": {"effect": "enemy_lore", "requires_subject": true},
+   "shadow_path": "second_path",
+   "free_undertaking": "gather_rumours"}
+]}

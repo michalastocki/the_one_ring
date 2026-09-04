@@ -1,0 +1,10 @@
+{"cultural_blessings": [
+  {"id": "example_blessing", "name": "Example Blessing",
+   "factory": "favour_rolls", "params": {"purpose": "valour_test"}},
+  {"id": "second_blessing", "name": "Second Blessing",
+   "factory": "enable_magical_success",
+   "params": {"predicate": {"not_miserable": true}}},
+  {"id": "example_weakness", "name": "Example Weakness",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_SHADOW_REMOVAL_CAP", "delta": -1}}
+]}

@@ -1,0 +1,6 @@
+{"shadow_paths": [
+  {"id": "example_path", "calling": "example_calling",
+   "steps": ["idle", "forgetful", "uncaring", "cowardly"]},
+  {"id": "second_path", "calling": "second_calling",
+   "steps": ["grasping", "mistrustful", "deceitful", "thieving"]}
+]}

@@ -1,0 +1,7 @@
+{"patron_benefits": [
+  {"id": "example_patron_benefit", "name": "Example Patron's Counsel",
+   "factory": "favour_rolls", "params": {"purpose": "shadow_test"}},
+  {"id": "second_patron_benefit", "name": "Second Patron's Reach",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_COUNCIL_ATTEMPTS", "delta": 1}}
+]}

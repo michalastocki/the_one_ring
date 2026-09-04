@@ -1,0 +1,111 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tor"
+version = "0.1.0"
+description = "A rules engine for The One Ring (2nd edition)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "jsonschema>=4.21",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.98",
+    "import-linter>=2.0",
+    "mypy>=1.9",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+tor = "tor.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config"
+
+[tool.coverage.run]
+branch = true
+source = ["tor"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# ruff formats Python code blocks inside Markdown. The numbered spec documents are
+# normative prose containing illustrative signatures, not code to be reformatted.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# `RuleViolation` and `Warning_` are spelled by 18-api-and-errors.md §18.1/§18.2. The
+# spec is normative and these names are part of the public API, so the naming lints
+# yield to it rather than the other way round.
+"tor/errors.py" = ["N818", "N801"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+disallow_any_explicit = false
+files = ["tor"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# Layering per 01-architecture.md §1.1. An import may only point downward.
+[tool.importlinter]
+root_package = "tor"
+
+[[tool.importlinter.contracts]]
+name = "tor layering"
+type = "layers"
+# Parenthesised layers are optional: they are modules the build order has not reached
+# yet. Drop the parentheses as each lands, so the constraint is never retrofitted.
+layers = [
+    "(tor.cli) | (tor.api) | (tor.session)",
+    "(tor.rules)",
+    "(tor.content)",
+    # 01.1 lists these three as independent siblings, but 02.3.1 puts build_request in
+    # tor.rolls and has it read the EffectBus. Both cannot hold; we follow 02.3.1 and
+    # order rolls above effects. See the note in tor/rolls.py.
+    "tor.rolls",
+    "tor.effects | tor.tables",
+    "tor.model",
+    "tor.dice",
+]
+# tor.errors sits beneath everything and is deliberately unlayered.
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "rules subsystems are independent"
+type = "independence"
+# Shared leaves (resources, shadow, injury, contest) are excluded by design:
+# every subsystem may depend on them, but they may depend on nothing at L4.
+# Uncomment each module as it lands; see 01-architecture.md §1.1.
+modules = [
+    # "tor.rules.combat",
+    # "tor.rules.journey",
+    # "tor.rules.council",
+    # "tor.rules.treasure",
+    # "tor.rules.eye",
+    # "tor.rules.fellowship",
+]

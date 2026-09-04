@@ -1,0 +1,10 @@
+{"id": "sources_of_injury", "die": "success",
+ "comment": "Cadence and the zero-Endurance override are the mechanically significant fields (16.4.3).",
+ "rows": [
+   {"match": 1, "value": {"id": "example_cold", "cadence": "half_hour", "zero_endurance": "dying"}},
+   {"match": 2, "value": {"id": "example_fall", "cadence": "once", "zero_endurance": "wounded"}},
+   {"match": 3, "value": {"id": "example_fire", "cadence": "round", "zero_endurance": "wounded"}},
+   {"match": 4, "value": {"id": "example_suffocation", "cadence": "round", "zero_endurance": "dying"}},
+   {"match": 5, "value": {"id": "example_poison", "cadence": "day", "zero_endurance": "dying"}},
+   {"match": 6, "value": {"id": "example_exhaustion", "cadence": "day", "zero_endurance": "unconscious"}}
+ ]}

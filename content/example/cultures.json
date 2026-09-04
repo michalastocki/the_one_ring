@@ -1,0 +1,68 @@
+{"cultures": [
+  {
+    "id": "example_folk",
+    "name": "Example Folk",
+    "cultural_blessing": {"effect": "example_blessing"},
+    "standard_of_living": "common",
+    "eye_awareness_weight": 1,
+    "derived": {"endurance_bonus": 20, "hope_bonus": 8, "parry_bonus": 12},
+    "attribute_sets": [
+      {"roll": 1, "strength": 5, "heart": 7, "wits": 2},
+      {"roll": 2, "strength": 4, "heart": 7, "wits": 3},
+      {"roll": 3, "strength": 5, "heart": 6, "wits": 3},
+      {"roll": 4, "strength": 4, "heart": 6, "wits": 4},
+      {"roll": 5, "strength": 5, "heart": 5, "wits": 4},
+      {"roll": 6, "strength": 6, "heart": 6, "wits": 2}
+    ],
+    "skills": {"awe": 1, "athletics": 1, "awareness": 0, "hunting": 2, "song": 1,
+               "craft": 1, "enhearten": 2, "travel": 1, "insight": 2, "healing": 0,
+               "courtesy": 2, "battle": 2, "persuade": 3, "stealth": 0, "scan": 1,
+               "explore": 1, "riddle": 0, "lore": 1},
+    "favoured_skill_choices": ["hunting", "battle"],
+    "favoured_skill_count": 1,
+    "combat_proficiencies": [
+      {"choose": ["bows", "swords"], "rating": 2},
+      {"choose": "any", "rating": 1}
+    ],
+    "distinctive_feature_choices": ["bold", "eager", "fair", "wilful"],
+    "distinctive_feature_count": 2,
+    "allowed_weapons": null,
+    "forbidden_items": [],
+    "languages": ["Example Tongue"],
+    "adventuring_age": {"min": 18, "typical_retirement": 45}
+  },
+  {
+    "id": "second_folk",
+    "name": "Second Folk",
+    "cultural_blessing": {"effect": "second_blessing"},
+    "cultural_weakness": {"effect": "example_weakness"},
+    "standard_of_living": "frugal",
+    "eye_awareness_weight": 0,
+    "derived": {"endurance_bonus": 22, "hope_bonus": 10, "parry_bonus": 14},
+    "attribute_bonus": {"count": 1, "choose": "any"},
+    "attribute_sets": [
+      {"roll": 1, "strength": 3, "heart": 5, "wits": 6},
+      {"roll": 2, "strength": 3, "heart": 6, "wits": 5},
+      {"roll": 3, "strength": 4, "heart": 5, "wits": 5},
+      {"roll": 4, "strength": 2, "heart": 6, "wits": 6},
+      {"roll": 5, "strength": 4, "heart": 4, "wits": 6},
+      {"roll": 6, "strength": 2, "heart": 7, "wits": 5}
+    ],
+    "skills": {"awe": 0, "athletics": 2, "awareness": 2, "hunting": 1, "song": 2,
+               "craft": 2, "enhearten": 1, "travel": 2, "insight": 1, "healing": 1,
+               "courtesy": 1, "battle": 0, "persuade": 1, "stealth": 3, "scan": 2,
+               "explore": 1, "riddle": 2, "lore": 2},
+    "favoured_skill_choices": ["stealth", "riddle"],
+    "favoured_skill_count": 1,
+    "combat_proficiencies": [
+      {"choose": ["bows", "spears"], "rating": 2},
+      {"choose": "any", "rating": 1}
+    ],
+    "distinctive_feature_choices": ["cunning", "merry", "wary", "fair"],
+    "distinctive_feature_count": 2,
+    "allowed_weapons": ["example_blade", "example_spear", "example_bow", "unarmed"],
+    "forbidden_items": ["example_great_shield"],
+    "languages": ["Second Tongue"],
+    "adventuring_age": {"min": 20, "typical_retirement": 50}
+  }
+]}

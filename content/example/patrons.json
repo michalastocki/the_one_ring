@@ -1,0 +1,12 @@
+{"patrons": [
+  {"id": "example_patron", "name": "The Example Patron",
+   "favoured_callings": ["example_calling"],
+   "fellowship_bonus": 1,
+   "benefit": {"effect": "example_patron_benefit"},
+   "agenda": "Invented. Not a canonical figure."},
+  {"id": "second_patron", "name": "The Second Patron",
+   "favoured_callings": ["second_calling"],
+   "fellowship_bonus": 2,
+   "benefit": {"effect": "second_patron_benefit"},
+   "agenda": "Also invented."}
+]}

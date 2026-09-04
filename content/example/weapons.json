@@ -1,0 +1,27 @@
+{"weapons": [
+  {"id": "example_blade", "name": "Example Blade", "damage": 4,
+   "injury": {"one_handed": 16, "two_handed": null},
+   "load": 2, "proficiency": "swords", "ranged": false, "throwable": false,
+   "two_handed_only": false, "can_cause_piercing_blow": true},
+
+  {"id": "example_great_axe", "name": "Example Great Axe", "damage": 7,
+   "injury": {"one_handed": null, "two_handed": 20},
+   "load": 4, "proficiency": "axes", "ranged": false, "throwable": false,
+   "two_handed_only": true, "can_cause_piercing_blow": true},
+
+  {"id": "example_spear", "name": "Example Spear", "damage": 3,
+   "injury": {"one_handed": 14, "two_handed": 16},
+   "load": 2, "proficiency": "spears", "ranged": false, "throwable": true,
+   "two_handed_only": false, "can_cause_piercing_blow": true},
+
+  {"id": "example_bow", "name": "Example Bow", "damage": 5,
+   "injury": {"one_handed": null, "two_handed": 16},
+   "load": 2, "proficiency": "bows", "ranged": true, "throwable": false,
+   "two_handed_only": true, "can_cause_piercing_blow": true},
+
+  {"id": "unarmed", "name": "Unarmed", "damage": 1,
+   "injury": {"one_handed": null, "two_handed": null},
+   "load": 0, "proficiency": "brawling", "ranged": false, "throwable": false,
+   "two_handed_only": false, "can_cause_piercing_blow": false,
+   "notes": "No Injury rating and cannot cause a Piercing Blow — the 05.4 edge case."}
+]}

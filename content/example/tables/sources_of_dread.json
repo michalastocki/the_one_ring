@@ -1,0 +1,7 @@
+{"id": "sources_of_dread", "die": "success",
+ "rows": [
+   {"match": [1, 2], "value": {"points": 1}},
+   {"match": [3, 4], "value": {"points": 2}},
+   {"match": 5, "value": {"points": 3}},
+   {"match": 6, "value": {"points": 4}}
+ ]}

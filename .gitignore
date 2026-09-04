@@ -2,3 +2,16 @@ __pycache__/
 *.pyc
 .coverage
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+build/
+dist/
+*.egg-info/
+.venv/
+
+# Licensed content packs are the implementer's own transcription and must never
+# be committed. content/example/ is invented, non-canonical data and IS tracked.
+content/*
+!content/example/
+!content/README.md

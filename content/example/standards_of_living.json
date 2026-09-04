@@ -1,0 +1,8 @@
+{"tiers": [
+  {"id": "poor",       "treasure_threshold": null, "useful_items": 0, "mount_vigour": null},
+  {"id": "frugal",     "treasure_threshold": 0,    "useful_items": 1, "mount_vigour": null},
+  {"id": "common",     "treasure_threshold": 30,   "useful_items": 2, "mount_vigour": 1},
+  {"id": "prosperous", "treasure_threshold": 90,   "useful_items": 3, "mount_vigour": 2},
+  {"id": "rich",       "treasure_threshold": 180,  "useful_items": 4, "mount_vigour": 3},
+  {"id": "very_rich",  "treasure_threshold": 300,  "useful_items": 4, "mount_vigour": 3}
+]}

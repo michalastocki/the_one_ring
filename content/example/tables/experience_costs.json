@@ -1,0 +1,18 @@
+{"id": "experience_costs", "die": "success",
+ "comment": "Carried as a table for schema uniformity; the ladders below are read by 05.10.",
+ "rows": [
+   {"match": [1, 6], "value": {
+     "previous_experience": {
+       "skills": [{"to": 1, "cost": 1}, {"to": 2, "cost": 2},
+                  {"to": 3, "cost": 3}, {"to": 4, "cost": 5}],
+       "proficiencies": [{"to": 1, "cost": 2}, {"to": 2, "cost": 4}, {"to": 3, "cost": 6}],
+       "budget": 10,
+       "heir_caps": {"skills": 4, "proficiencies": 3}
+     },
+     "advancement": {
+       "ability": [{"to": 1, "cost": 4}, {"to": 2, "cost": 8}, {"to": 3, "cost": 12},
+                   {"to": 4, "cost": 20}, {"to": 5, "cost": 26}, {"to": 6, "cost": 30}],
+       "rank": [{"to": 2, "cost": 8}, {"to": 3, "cost": 12},
+                {"to": 4, "cost": 20}, {"to": 5, "cost": 26}, {"to": 6, "cost": 30}]
+     }}}
+ ]}

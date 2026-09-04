@@ -1,0 +1,7 @@
+{"id": "eye_awareness", "die": "success",
+ "comment": "14.3 — the Loremaster may grade an eye result up or down; this is the default weighting.",
+ "rows": [
+   {"match": [1, 4], "value": {"weight": 1}},
+   {"match": 5, "value": {"weight": 2}},
+   {"match": 6, "value": {"weight": 3}}
+ ]}

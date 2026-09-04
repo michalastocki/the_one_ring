@@ -1,0 +1,11 @@
+{"flaws": [
+  {"id": "idle", "name": "Idle", "factory": "ill_favour_when_applicable"},
+  {"id": "forgetful", "name": "Forgetful", "factory": "ill_favour_when_applicable"},
+  {"id": "uncaring", "name": "Uncaring", "factory": "ill_favour_when_applicable"},
+  {"id": "cowardly", "name": "Cowardly", "factory": "ill_favour_when_applicable"},
+
+  {"id": "grasping", "name": "Grasping", "factory": "ill_favour_when_applicable"},
+  {"id": "mistrustful", "name": "Mistrustful", "factory": "ill_favour_when_applicable"},
+  {"id": "deceitful", "name": "Deceitful", "factory": "ill_favour_when_applicable"},
+  {"id": "thieving", "name": "Thieving", "factory": "ill_favour_when_applicable"}
+]}
