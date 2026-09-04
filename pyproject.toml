@@ -78,11 +78,17 @@ root_package = "tor"
 [[tool.importlinter.contracts]]
 name = "tor layering"
 type = "layers"
+# Parenthesised layers are optional: they are modules the build order has not reached
+# yet. Drop the parentheses as each lands, so the constraint is never retrofitted.
 layers = [
-    "tor.cli | tor.api | tor.session",
-    "tor.rules",
-    "tor.content",
-    "tor.rolls | tor.effects | tor.tables",
+    "(tor.cli) | (tor.api) | (tor.session)",
+    "(tor.rules)",
+    "(tor.content)",
+    # 01.1 lists these three as independent siblings, but 02.3.1 puts build_request in
+    # tor.rolls and has it read the EffectBus. Both cannot hold; we follow 02.3.1 and
+    # order rolls above effects. See the note in tor/rolls.py.
+    "tor.rolls",
+    "tor.effects | tor.tables",
     "tor.model",
     "tor.dice",
 ]

@@ -9,17 +9,27 @@ The consequences of Weary, Miserable, Favoured, Ill-favoured, Hope spending, Ins
 support and bonus dice are implemented **once**, here. No subsystem re-implements
 "outlined dice count as zero".
 
-``build_request`` — the one place that consults the ``EffectBus`` for roll modification —
-lands with :mod:`tor.effects`, which is built after this module (``00.5`` steps 3 and 5).
-Keeping it there rather than here is what lets ``tor.rolls`` and ``tor.effects`` stay
-independent siblings on layer 2, as ``01.1`` requires.
+``build_request`` is the **only** place that consults the ``EffectBus`` for roll
+modification (``02.3.1``). Subsystems call it and then :func:`resolve`; they never assemble
+a ``RollRequest`` by hand, except for pure table rolls that have no character behind them.
+
+.. note::
+   The spec is internally inconsistent on one point, and this module resolves it
+   deliberately. ``01.1`` lists ``tor.rolls | tor.effects | tor.tables`` as independent
+   siblings, while ``02.3.1`` puts ``build_request`` in ``tor.rolls`` and has it read the
+   ``EffectBus`` — which is an import between two supposed siblings. Both cannot hold.
+   We follow ``02.3.1``, the more specific statement, and place ``tor.rolls`` one layer
+   *above* ``tor.effects`` in the import-linter contract. The direction is also the better
+   design: the hook mechanism has no business knowing what a ``RollRequest`` is, whereas
+   assembling one plainly requires the effects that modify it.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any, Protocol
 
 from tor.dice import (
     FeatFace,
@@ -30,6 +40,16 @@ from tor.dice import (
     auto_success_face,
     feat_numeric,
     feat_ordering_key,
+)
+from tor.effects.bus import EffectBus
+from tor.effects.hooks import (
+    DEFAULT_ENVIRONMENT,
+    Environment,
+    FlagContribution,
+    Hook,
+    HookContext,
+    NumericContribution,
+    SceneKind,
 )
 from tor.errors import RuleViolation
 from tor.model.ids import AbilityId, TaskId
@@ -44,7 +64,10 @@ __all__ = [
     "RollPurpose",
     "RollRequest",
     "RollResult",
+    "RollingCharacter",
+    "SupportInput",
     "attribute_tn",
+    "build_request",
     "resolve",
 ]
 
@@ -375,3 +398,176 @@ def policy_sources(policy: FeatDicePolicy, source: str = "policy") -> dict[str, 
     if policy is FeatDicePolicy.ILL_FAVOURED:
         return {"favoured_sources": (), "ill_favoured_sources": (source,)}
     return {"favoured_sources": (), "ill_favoured_sources": ()}
+
+
+# ----------------------------------------------------------------------------------
+# Building a request from a character (02.3.1)
+# ----------------------------------------------------------------------------------
+
+
+#: Hope spent for bonus dice yields +1d, or +2d while Inspired (``02.3.3``).
+HOPE_DICE = 1
+INSPIRED_HOPE_DICE = 2
+#: A supporter grants +1d, or +2d when the acting hero is their Fellowship Focus.
+SUPPORT_DICE = 1
+FOCUSED_SUPPORT_DICE = 2
+
+
+class RollingCharacter(Protocol):
+    """The narrow view :func:`build_request` needs (``01.5``).
+
+    Implemented by both ``Hero`` and ``AdversaryInstance``. This structural typing is why
+    one code path serves both despite their very different sheets, and why the Feat-die
+    icon inversion is a flag rather than a parallel implementation.
+    """
+
+    def rating(self, ability: AbilityId) -> int: ...
+
+    @property
+    def effects(self) -> EffectBus: ...
+
+
+class SupportInput(Protocol):
+    """One companion helping with a roll.
+
+    The supporter must hold rank 1 or better in a Skill the Loremaster deems appropriate;
+    the engine validates the rank, the appropriateness is an input.
+    """
+
+    @property
+    def rating(self) -> int: ...
+
+    @property
+    def is_focus(self) -> bool: ...
+
+    @property
+    def approved(self) -> bool: ...
+
+
+def build_request(
+    character: RollingCharacter,
+    ability: AbilityId | None,
+    *,
+    bus: EffectBus,
+    target_number: int | None = None,
+    purpose: RollPurpose = RollPurpose.GENERIC,
+    rating: int | None = None,
+    spend_hope: bool = False,
+    support: SupportInput | None = None,
+    useful_item: bool = False,
+    bonus_dice: int = 0,
+    penalty_dice: int = 0,
+    weary: bool = False,
+    eye_is_auto_failure: bool = False,
+    icon_inverted: bool = False,
+    magical_success: bool = False,
+    scene: SceneKind | None = None,
+    environment: Environment = DEFAULT_ENVIRONMENT,
+    target: Any = None,
+    extra: Mapping[str, Any] | None = None,
+) -> RollRequest:
+    """Assemble a request, folding in every effect that modifies the roll."""
+    ctx = HookContext(
+        hook=Hook.MODIFY_ROLL_REQUEST,
+        actor=character,
+        target=target,
+        scene=scene,
+        environment=environment,
+        ability=ability,
+        purpose=str(purpose),
+        extra=dict(extra or {}),
+    )
+
+    if magical_success and not _magical_success_allowed(bus, ctx):
+        raise RuleViolation(
+            f"no effect grants a magical success for {ability!r}",
+            rule_reference="magical_success_eligibility",
+            suggestion="a cultural blessing, Cultural Virtue, or item Blessing must permit it",
+        )
+
+    base_rating = rating if rating is not None else (character.rating(ability) if ability else 0)
+
+    favoured: list[str] = []
+    ill_favoured: list[str] = []
+    effect_dice = 0
+    for contribution in bus.collect(Hook.MODIFY_ROLL_REQUEST, ctx):
+        if isinstance(contribution, NumericContribution):
+            effect_dice += contribution.delta
+        elif isinstance(contribution, FlagContribution):
+            if contribution.flag == "favoured":
+                favoured.append(str(contribution.value))
+            elif contribution.flag == "ill_favoured":
+                ill_favoured.append(str(contribution.value))
+
+    total_bonus = bonus_dice + effect_dice
+    if spend_hope:
+        total_bonus += INSPIRED_HOPE_DICE if _is_inspired(bus, ctx) else HOPE_DICE
+    if support is not None:
+        total_bonus += _support_dice(support)
+    if useful_item:
+        # +1d on a non-combat roll, and only one item may benefit a given roll (03.5.2).
+        total_bonus += 1
+
+    return RollRequest(
+        ability=ability,
+        rating=base_rating,
+        target_number=target_number,
+        favoured_sources=tuple(favoured),
+        ill_favoured_sources=tuple(ill_favoured),
+        bonus_dice=total_bonus,
+        penalty_dice=penalty_dice,
+        weary=weary,
+        eye_is_auto_failure=eye_is_auto_failure,
+        icon_inverted=icon_inverted,
+        magical_success=magical_success,
+        purpose=purpose,
+    )
+
+
+def _support_dice(support: SupportInput) -> int:
+    """A supporter's contribution. The Focus bonus **replaces** the ordinary one."""
+    if not support.approved:
+        raise RuleViolation(
+            "support needs the Loremaster's approval that the circumstances allow it",
+            rule_reference="support_approval",
+        )
+    if support.rating < 1:
+        raise RuleViolation(
+            "a supporter needs at least rank 1 in an appropriate Skill",
+            rule_reference="support_rank",
+        )
+    return FOCUSED_SUPPORT_DICE if support.is_focus else SUPPORT_DICE
+
+
+def _is_inspired(bus: EffectBus, ctx: HookContext) -> bool:
+    inspiration_ctx = HookContext(
+        hook=Hook.MODIFY_INSPIRATION,
+        actor=ctx.actor,
+        target=ctx.target,
+        scene=ctx.scene,
+        environment=ctx.environment,
+        ability=ctx.ability,
+        purpose=ctx.purpose,
+        extra=ctx.extra,
+    )
+    return any(
+        isinstance(c, FlagContribution) and c.flag == "inspired"
+        for c in bus.collect(Hook.MODIFY_INSPIRATION, inspiration_ctx)
+    )
+
+
+def _magical_success_allowed(bus: EffectBus, ctx: HookContext) -> bool:
+    eligibility_ctx = HookContext(
+        hook=Hook.MAGICAL_SUCCESS_ELIGIBLE,
+        actor=ctx.actor,
+        target=ctx.target,
+        scene=ctx.scene,
+        environment=ctx.environment,
+        ability=ctx.ability,
+        purpose=ctx.purpose,
+        extra=ctx.extra,
+    )
+    return any(
+        isinstance(c, FlagContribution) and c.flag == "magical_success_eligible"
+        for c in bus.collect(Hook.MAGICAL_SUCCESS_ELIGIBLE, eligibility_ctx)
+    )
