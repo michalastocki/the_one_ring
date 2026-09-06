@@ -49,10 +49,17 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–6 of the order in `00-README.md` §5 are complete: `tor.dice`, `tor.tables`,
-`tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, plus `content/example/`. That is
-the pure core and all three seams; the rules subsystems (steps 7–15), the session layer,
-and the API and CLI are not yet implemented.
+Build steps 1–7, 9 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+`tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, and the
+three shared rules leaves `tor.rules.resources`, `tor.rules.contest` and
+`tor.rules.injury`, plus `content/example/`. That is the pure core, all three seams, and the
+tier every later subsystem rests on. Character creation (step 8), Shadow (10), and
+everything from combat onward are not yet implemented, nor are the session layer, the API
+and the CLI.
+
+Steps 8 and 9 are taken **out of order**: `tor.rules.contest` and `tor.rules.injury` landed
+before `tor.rules.creation`. Neither depends on the other, and the two small shared leaves
+complete the tier, so creation gets an undiluted change of its own.
 
 Content packs are validated in two passes. The JSON Schemas in `tor/content/schema/` check
 shape — required fields, types, enumerated values, arity, and any field the format does not
@@ -60,10 +67,26 @@ define; `05.1.1`'s referential and semantic checks then run over the merged stac
 schemas own everything a schema can express, so the loader holds no second implementation
 of the same rule.
 
-One deliberate deviation from the spec is recorded in `tor/rolls.py`: `01.1` lists
-`tor.rolls`, `tor.effects` and `tor.tables` as independent siblings, while `02.3.1` puts
-`build_request` in `tor.rolls` and has it read the `EffectBus`. Both cannot hold, so
-`tor.rolls` sits one layer above `tor.effects` and the import contract says so.
+Three deliberate deviations from the spec are recorded, each in the module that makes it:
+
+- `tor/rolls.py` — `01.1` lists `tor.rolls`, `tor.effects` and `tor.tables` as independent
+  siblings, while `02.3.1` puts `build_request` in `tor.rolls` and has it read the
+  `EffectBus`. Both cannot hold, so `tor.rolls` sits one layer above `tor.effects` and the
+  import contract says so. The same module narrows `RollingCharacter` to the one member
+  `build_request` actually consults: `01.5`'s `effects` is unsatisfiable, because an
+  `EffectBus` on `Hero` would make `tor.model` import `tor.effects`, which imports
+  `tor.model.derive` — a runtime import cycle, not merely a layering breach.
+- `tor/events.py` — `07.1` types every `tor.rules.resources` function `-> list[Event]`,
+  while `17.4` defines `Event` in `tor.session`, above the subsystems that may not import
+  it. The record lives in `tor.events`, below `tor.rules`; `seq` and `timestamp` are log
+  coordinates a pure rule cannot know, so the log stamps them on append.
+- `tor/rules/resources.py` — `7.4` and `7.5` write `recompute_load(hero)` and
+  `recompute_conditions(hero)`, but Load needs the effect bus and the gear types, and
+  `17.5` and `04.7` both forbid caching it on the `Hero`. Both take a keyword-only `ctx`.
+- `tor/rules/contest.py` — `09.1`'s `evaluate` code block returns `DISASTER` for a
+  scoreless contest, while the prose two lines below says the two adapters differ on
+  exactly that. The shared engine returns `TOTAL_FAILURE`; the council adapter promotes it,
+  because for a council "every attempt failed" *is* a Disaster.
 
 ## Development
 
@@ -77,8 +100,8 @@ ruff check . && ruff format --check .
 lint-imports                                            # the layering contract
 ```
 
-`tor.rolls` and `tor.effects` are held to 100% branch coverage — that is where the rules
-live (`19-testing.md`).
+`tor.rolls`, `tor.effects` and `tor.rules` are held to 100% branch coverage — that is where
+the rules live (`19-testing.md`).
 
 Tests use `ScriptedRandomness`, which **raises when its dice queue runs dry**. That is
 deliberate: a test that scripts two Success dice and sees the engine ask for three has

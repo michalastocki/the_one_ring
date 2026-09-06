@@ -18,8 +18,11 @@ from tor.content.entities import (
     StandardOfLivingTier,
     Undertaking,
 )
+from tor.effects.bus import Effect
+from tor.effects.library import build_effect
 from tor.errors import ContentError
 from tor.model.gear import ArmourType, ShieldType, WeaponType
+from tor.model.ids import EffectId
 from tor.tables import LookupTable
 
 __all__ = ["ContentPack"]
@@ -116,6 +119,14 @@ class ContentPack:
     def weapon(self, item_id: str) -> WeaponType:
         return _require(self.weapons, item_id, "weapon")
 
+    def armour_type(self, item_id: str) -> ArmourType:
+        """One armour or helm type. Named ``armour_type`` because ``armour`` is the field."""
+        return _require(self.armour, item_id, "armour")
+
+    def shield_type(self, item_id: str) -> ShieldType:
+        """One shield type. Named for the same reason as :meth:`armour_type`."""
+        return _require(self.shields, item_id, "shield")
+
     def effect(self, effect_id: str) -> EffectDefinition:
         return _require(self.effects, effect_id, "effect")
 
@@ -130,6 +141,18 @@ class ContentPack:
 
     def effects_of_kind(self, kind: str) -> dict[str, EffectDefinition]:
         return {k: v for k, v in self.effects.items() if v.kind == kind}
+
+    def instantiate(self, effect_id: str) -> Effect:
+        """Build the live :class:`Effect` for a declaration (``04.5``).
+
+        The bridge from a pack's declarative row to the object an ``EffectBus`` registers.
+        Everything about *which* effects a hero carries is the caller's business — this
+        only turns one id into one effect.
+        """
+        definition = self.effect(effect_id)
+        return build_effect(
+            EffectId(definition.id), definition.kind, definition.factory, definition.params
+        )
 
 
 def _require(section: Mapping[str, V], key: str, what: str) -> V:
