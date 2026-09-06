@@ -86,8 +86,14 @@ type = "layers"
 # yet. Drop the parentheses as each lands, so the constraint is never retrofitted.
 layers = [
     "(tor.cli) | (tor.api) | (tor.session)",
-    "(tor.rules)",
-    "(tor.content)",
+    "tor.rules",
+    "tor.content",
+    # 07.1 types every tor.rules.resources function `-> list[Event]`, while 17.4 defines
+    # Event in tor.session at L5 — which a subsystem may not import. We keep 07.1's
+    # signature and lift the record into tor.events, above tor.rolls because an Event
+    # carries the RollResults that produced it. seq and timestamp are stamped at L5.
+    # See the note in tor/events.py.
+    "tor.events",
     # 01.1 lists these three as independent siblings, but 02.3.1 puts build_request in
     # tor.rolls and has it read the EffectBus. Both cannot hold; we follow 02.3.1 and
     # order rolls above effects. See the note in tor/rolls.py.
@@ -113,3 +119,18 @@ modules = [
     # "tor.rules.eye",
     # "tor.rules.fellowship",
 ]
+
+[[tool.importlinter.contracts]]
+name = "shared rules leaves"
+type = "layers"
+# 01.1 excludes the shared leaves from the independence contract above, but leaves their
+# order among themselves unstated. This fixes it: the subsystems sit above the leaves,
+# injury and contest may use resources, and resources uses only the context. As with the
+# layering contract, parenthesised modules have not landed yet.
+layers = [
+    "(tor.rules.combat) | (tor.rules.journey) | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.shadow) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | (tor.rules.creation)",
+    "(tor.rules.injury) | (tor.rules.contest)",
+    "tor.rules.resources",
+    "tor.rules.context",
+]
+exhaustive = false

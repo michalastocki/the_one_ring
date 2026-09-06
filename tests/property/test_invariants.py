@@ -13,10 +13,24 @@ from tor.dice import FEAT_FACES, ScriptedRandomness, SuccessDie
 from tor.effects.bus import EffectBus, EffectKind, EffectSource
 from tor.effects.hooks import Hook, HookContext
 from tor.effects.library import build_effect
+from tor.model.abilities import COMBAT_PROFICIENCIES, SKILLS
+from tor.model.attributes import AttributeSet
 from tor.model.conditions import ResourcePool, StandardOfLiving, standard_of_living_for
 from tor.model.derive import DerivedStat, Modifier
-from tor.model.ids import EffectId
+from tor.model.gear import ArmourCategory, ArmourInstance, ArmourType, Gear
+from tor.model.hero import Hero
+from tor.model.ids import CallingId, CultureId, EffectId, HeroId, ItemId
 from tor.rolls import Degree, Outcome, RollRequest, resolve
+from tor.rules.context import RulesContext
+from tor.rules.resources import (
+    ChangeSource,
+    change_endurance,
+    change_fatigue,
+    change_hope,
+    change_treasure,
+    recompute_conditions,
+    recompute_load,
+)
 
 LADDER: list[tuple[StandardOfLiving, int | None]] = [
     (StandardOfLiving.POOR, None),
@@ -207,3 +221,136 @@ class TestStandardOfLiving:
     @given(treasure=st.integers(min_value=0, max_value=1000))
     def test_the_tier_is_always_a_defined_one(self, treasure: int) -> None:
         assert standard_of_living_for(treasure, LADDER) in set(StandardOfLiving)
+
+
+MAIL = ItemId("example_mail")
+
+
+class OneArmour:
+    """A `GearIndex` holding a single suit, so Load has something to sum."""
+
+    def __init__(self, load: int) -> None:
+        self._armour = ArmourType(
+            id=MAIL, name="Example Mail", protection=3, load=load, category=ArmourCategory.MAIL
+        )
+
+    def weapon(self, item_id: str) -> object:  # pragma: no cover - never reached
+        raise KeyError(item_id)
+
+    def armour_type(self, item_id: str) -> ArmourType:
+        return self._armour
+
+    def shield_type(self, item_id: str) -> object:  # pragma: no cover - never reached
+        raise KeyError(item_id)
+
+
+def hero_with(*, endurance: int, hope: int, shadow: int, fatigue: int) -> Hero:
+    return Hero(
+        id=HeroId("h"),
+        name="Testfolk",
+        culture=CultureId("example_folk"),
+        calling=CallingId("example_calling"),
+        age=30,
+        attributes=AttributeSet(strength=5, heart=6, wits=3),
+        skills=dict.fromkeys(SKILLS, 1),
+        proficiencies=dict.fromkeys(COMBAT_PROFICIENCIES, 0),
+        max_endurance=DerivedStat(base=30),
+        max_hope=DerivedStat(base=20),
+        parry=DerivedStat(base=15),
+        endurance=endurance,
+        hope=hope,
+        shadow=shadow,
+        fatigue=fatigue,
+        gear=Gear(armour=ArmourInstance(type_id=MAIL)),
+    )
+
+
+class TestResourceInvariants:
+    """19.5 — the conditions are a pure function of the numbers, after every change."""
+
+    @given(
+        endurance=st.integers(min_value=0, max_value=30),
+        hope=st.integers(min_value=0, max_value=20),
+        shadow=st.integers(min_value=0, max_value=20),
+        fatigue=st.integers(min_value=0, max_value=10),
+        armour_load=st.integers(min_value=0, max_value=20),
+    )
+    def test_weary_and_miserable_are_exactly_their_thresholds(
+        self, endurance: int, hope: int, shadow: int, fatigue: int, armour_load: int
+    ) -> None:
+        assume(shadow <= 20)
+        hero = hero_with(endurance=endurance, hope=hope, shadow=shadow, fatigue=fatigue)
+        ctx = RulesContext(gear=OneArmour(armour_load), buses={hero.id: EffectBus()})
+
+        recompute_conditions(hero, ctx=ctx)
+        load = recompute_load(hero, ctx=ctx)
+        assert hero.conditions.weary == (hero.endurance <= load)
+        assert hero.conditions.miserable == (hero.shadow >= hero.hope)
+
+    @given(
+        deltas=st.lists(
+            st.tuples(
+                st.sampled_from(["endurance", "hope", "fatigue", "treasure"]),
+                st.integers(min_value=-8, max_value=8),
+            ),
+            max_size=12,
+        )
+    )
+    def test_invariants_hold_after_any_sequence_of_legal_changes(
+        self, deltas: list[tuple[str, int]]
+    ) -> None:
+        hero = hero_with(endurance=30, hope=20, shadow=0, fatigue=0)
+        ctx = RulesContext(gear=OneArmour(4), buses={hero.id: EffectBus()})
+
+        for what, delta in deltas:
+            if what == "endurance":
+                change_endurance(hero, delta, ChangeSource.COMBAT, ctx=ctx)
+            elif what == "hope":
+                # A spend at zero Hope is illegal by 07.3, so only offer what is legal.
+                if delta < 0 and (hero.hope == 0 or -delta > hero.hope):
+                    continue
+                change_hope(hero, delta, ChangeSource.EFFECT, ctx=ctx)
+            elif what == "fatigue":
+                change_fatigue(hero, delta, ChangeSource.JOURNEY, ctx=ctx)
+            else:
+                if delta < 0 and -delta > hero.treasure.carried:
+                    continue
+                change_treasure(hero, delta, ChangeSource.TREASURE_FOUND, ctx=ctx)
+
+        hero.validate()
+        assert 0 <= hero.endurance <= hero.max_endurance.value
+        assert 0 <= hero.hope <= hero.max_hope.value
+        assert 0 <= hero.shadow <= hero.max_hope.value
+        assert hero.fatigue >= 0
+        assert hero.treasure.carried >= 0
+
+    @given(armour_load=st.integers(min_value=0, max_value=20))
+    def test_recomputing_load_is_idempotent(self, armour_load: int) -> None:
+        hero = hero_with(endurance=20, hope=10, shadow=0, fatigue=2)
+        ctx = RulesContext(gear=OneArmour(armour_load), buses={hero.id: EffectBus()})
+        assert recompute_load(hero, ctx=ctx) == recompute_load(hero, ctx=ctx)
+
+    @given(delta=modifiers)
+    def test_registering_then_unregistering_a_load_effect_restores_it_exactly(
+        self, delta: int
+    ) -> None:
+        # 19.5 calls this the property that catches every effect-residue bug — a smashed
+        # shield, a dropped helm, an expired bonus.
+        hero = hero_with(endurance=20, hope=10, shadow=0, fatigue=0)
+        bus = EffectBus()
+        ctx = RulesContext(gear=OneArmour(9), buses={hero.id: bus})
+        before = recompute_load(hero, ctx=ctx)
+
+        source = EffectSource.item("mail#1")
+        bus.register(
+            build_effect(
+                EffectId("some_reward"),
+                EffectKind.REWARD,
+                "numeric_modifier",
+                {"hook": "MODIFY_ITEM_LOAD", "delta": delta},
+            ),
+            source,
+        )
+        recompute_load(hero, ctx=ctx)
+        bus.unregister_source(source)
+        assert recompute_load(hero, ctx=ctx) == before

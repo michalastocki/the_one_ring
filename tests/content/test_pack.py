@@ -854,18 +854,13 @@ class TestHookCoverage:
             Hook.MODIFY_ENGAGEMENT,
             Hook.WOUND_INTERCEPT,
             # journey (10) — build step 12
-            Hook.MODIFY_FATIGUE_GAIN,
             Hook.MODIFY_JOURNEY_EVENT_ROLL,
             Hook.JOURNEY_ROLE_LIMITS,
             Hook.ON_JOURNEY_END,
-            # resources and shadow (07, 11) — build steps 7 and 10
+            # shadow (11) — build step 10
             Hook.MODIFY_SHADOW_GAIN,
             Hook.MODIFY_SHADOW_TEST,
             Hook.MODIFY_SHADOW_FLOOR,
-            Hook.MODIFY_SHORT_REST_RECOVERY,
-            Hook.MODIFY_PROLONGED_REST_RECOVERY,
-            Hook.SHORT_REST_COUNTS_AS_PROLONGED,
-            Hook.MODIFY_HOPE_RECOVERY,
             # council (09) — build step 13
             Hook.MODIFY_AUDIENCE_ATTITUDE,
             # progression, fellowship and phase (15, 17) — build steps 15 and 16

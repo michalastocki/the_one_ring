@@ -133,6 +133,20 @@ def _condition(ctx: HookContext, name: str) -> bool:
     return bool(getattr(conditions, name, False))
 
 
+def _stat_value(actor: Any, name: str) -> int:
+    """One of the actor's numbers, by the name a content pack writes.
+
+    Attributes live on ``Hero.attributes``, ranks and an adversary's levels directly on the
+    actor. A bare ``getattr(actor, "strength", 0)`` therefore reads 0 on a ``Hero`` and
+    silently mis-scales any effect keyed to STRENGTH, HEART or WITS — so look in the
+    Attribute set first, then on the actor itself.
+    """
+    attributes = getattr(actor, "attributes", None)
+    if attributes is not None and hasattr(attributes, name):
+        return int(getattr(attributes, name))
+    return int(getattr(actor, name, 0))
+
+
 # ----------------------------------------------------------------------------------
 # Factories
 # ----------------------------------------------------------------------------------
@@ -149,7 +163,7 @@ def _usage_from(spec: Mapping[str, Any] | None) -> UsagePolicy | None:
     if isinstance(limit, str):
         # "equal to your WISDOM" and similar, resolved against the actor at fire time.
         stat = limit
-        return UsagePolicy(scope=scope, limit=lambda ctx: int(getattr(ctx.actor, stat, 0)))
+        return UsagePolicy(scope=scope, limit=lambda ctx: _stat_value(ctx.actor, stat))
     return UsagePolicy(scope=scope, limit=int(limit))
 
 
@@ -197,7 +211,7 @@ def greater_of(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any])
     stat = str(params.get("stat", ""))
 
     def listen(ctx: HookContext) -> Contribution:
-        from_stat = int(getattr(ctx.actor, stat, 0))
+        from_stat = _stat_value(ctx.actor, stat)
         return NumericContribution(source=effect_id, delta=max(flat, from_stat))
 
     return _effect(effect_id, kind, {hook: listen}, params)
@@ -302,7 +316,7 @@ def modify_piercing_threshold(
 
     def listen(ctx: HookContext) -> Contribution:
         if minus_stat is not None:
-            value = 10 - int(getattr(ctx.actor, str(minus_stat), 0))
+            value = 10 - _stat_value(ctx.actor, str(minus_stat))
         else:
             value = int(threshold if threshold is not None else 10)
         return ReplacementContribution(source=effect_id, value=value)
@@ -412,6 +426,57 @@ def _hook(params: Mapping[str, Any], effect_id: EffectId, default: Hook | None =
         return Hook(raw)
     except ValueError as exc:
         raise ContentError(f"unknown hook {raw!r}", entity_id=str(effect_id)) from exc
+
+
+@register_factory("set_flag")
+def set_flag(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -> Effect:
+    """``{"hook": "SHORT_REST_COUNTS_AS_PROLONGED", "flag": "counts_as_prolonged"}``
+
+    The Flag counterpart to :func:`numeric_modifier`: a listener that simply declares
+    something true on its hook. ``04.5``'s review rule is that a fifteenth hand-written
+    effect means a factory is missing, and this is one of the missing ones — it covers the
+    Cultural Virtue making a short rest count as prolonged (``07.6``), the one that
+    suppresses Fatigue gain (``10.7``), and the poisoned condition that forbids resting
+    (``16.4.5``), none of which needs Python of its own.
+    """
+    hook = _hook(params, effect_id)
+    flag = str(params.get("flag", ""))
+    if not flag:
+        raise ContentError("set_flag needs a 'flag'", entity_id=str(effect_id))
+    value = params.get("value", True)
+
+    def listen(_ctx: HookContext) -> Contribution:
+        return FlagContribution(source=effect_id, flag=flag, value=value)
+
+    return _effect(effect_id, kind, {hook: listen}, params)
+
+
+@register_factory("rest_recovery")
+def rest_recovery(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -> Effect:
+    """``{"hook": "MODIFY_SHORT_REST_RECOVERY", "stat": "wisdom", "target": "company"}``
+
+    Endurance a rest restores beyond the base formula (``07.6``). ``delta`` is a flat
+    amount; ``stat`` scales it by an Attribute or rank instead. ``target: "company"`` is the
+    consequential one — one Cultural Virtue restores an amount equal to the resting hero's
+    WISDOM to *every* member of the Company, not to the actor, so it contributes an action
+    the resting code distributes rather than a number it adds to one hero.
+    """
+    hook = _hook(params, effect_id)
+    delta = int(params.get("delta", 0))
+    stat = str(params.get("stat", ""))
+    company = str(params.get("target", "actor")) == "company"
+
+    def listen(ctx: HookContext) -> Contribution:
+        amount = _stat_value(ctx.actor, stat) if stat else delta
+        if company:
+            return ActionContribution(
+                source=effect_id,
+                action="company_recovery",
+                payload={"amount": amount},
+            )
+        return NumericContribution(source=effect_id, delta=amount)
+
+    return _effect(effect_id, kind, {hook: listen}, params)
 
 
 # ----------------------------------------------------------------------------------
