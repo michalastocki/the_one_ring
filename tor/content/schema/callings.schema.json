@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/callings.schema.json",
+  "title": "callings.json (05.3)",
+  "type": "object",
+  "required": ["callings"],
+  "additionalProperties": false,
+  "properties": {
+    "callings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "favoured_skill_choices", "distinctive_feature", "shadow_path"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "favoured_skill_choices": {"$ref": "common.schema.json#/$defs/idList"},
+          "favoured_skill_count": {"type": "integer", "minimum": 0},
+          "distinctive_feature": {
+            "type": "object",
+            "required": ["effect"],
+            "properties": {
+              "effect": {"$ref": "common.schema.json#/$defs/id"},
+              "requires_subject": {"type": "boolean"}
+            },
+            "additionalProperties": false
+          },
+          "shadow_path": {"$ref": "common.schema.json#/$defs/id"},
+          "free_undertaking": {"$ref": "common.schema.json#/$defs/id"}
+        }
+      }
+    }
+  }
+}

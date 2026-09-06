@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/adversaries.schema.json",
+  "title": "adversaries.json (05.7)",
+  "type": "object",
+  "required": ["adversaries"],
+  "additionalProperties": false,
+  "properties": {
+    "adversaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "attribute_level", "endurance", "might", "drive", "parry", "armour", "attacks"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "category": {"$ref": "common.schema.json#/$defs/id"},
+          "creature_types": {"$ref": "common.schema.json#/$defs/idList"},
+          "size": {"type": "string", "enum": ["human", "large"]},
+          "attribute_level": {"type": "integer", "minimum": 0},
+          "endurance": {"type": "integer", "minimum": 0},
+          "might": {"type": "integer", "minimum": 1},
+          "drive": {
+            "type": "object",
+            "required": ["kind", "value"],
+            "properties": {
+              "kind": {"type": "string", "enum": ["hate", "resolve"]},
+              "value": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": false
+          },
+          "parry": {"type": "integer", "minimum": 0},
+          "armour": {"type": "integer", "minimum": 0},
+          "icon_inverted": {"type": "boolean"},
+          "attacks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["name", "rating", "damage", "injury"],
+              "properties": {
+                "name": {"type": "string"},
+                "rating": {"type": "integer", "minimum": 0},
+                "damage": {"type": "integer", "minimum": 0},
+                "injury": {"type": "integer", "minimum": 0},
+                "special_damage": {"type": "array", "items": {"type": "string"}},
+                "ranged": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            }
+          },
+          "always_available_special_damage": {"type": "array", "items": {"type": "string"}},
+          "fell_abilities": {"$ref": "common.schema.json#/$defs/idList"},
+          "distinctive_features": {"$ref": "common.schema.json#/$defs/idList"}
+        }
+      }
+    }
+  }
+}

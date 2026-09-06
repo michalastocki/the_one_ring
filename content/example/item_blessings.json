@@ -1,0 +1,5 @@
+{"item_blessings": [
+  {"id": "example_blessing_of_light", "name": "Blessing of Light",
+   "factory": "favour_rolls",
+   "params": {"purpose": "attack", "predicate": {"in_darkness": true}}}
+]}

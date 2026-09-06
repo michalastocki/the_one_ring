@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/effects.schema.json",
+  "title": "Any of the nine declarative effect files",
+  "description": "One section array, whose name selects the default EffectKind.",
+  "type": "object",
+  "minProperties": 1,
+  "maxProperties": 1,
+  "additionalProperties": {
+    "type": "array",
+    "items": {"$ref": "common.schema.json#/$defs/effect"}
+  }
+}

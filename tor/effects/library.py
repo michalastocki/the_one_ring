@@ -37,6 +37,7 @@ from tor.model.ids import EffectId
 
 __all__ = [
     "EFFECT_FACTORIES",
+    "REPLACEMENT_FACTORIES",
     "build_effect",
     "build_predicate",
     "register_factory",
@@ -45,11 +46,23 @@ __all__ = [
 Factory = Callable[[EffectId, EffectKind, Mapping[str, Any]], Effect]
 
 _FACTORIES: dict[str, Factory] = {}
+_REPLACING: set[str] = set()
 
 
-def register_factory(name: str) -> Callable[[Factory], Factory]:
+def register_factory(name: str, *, replaces: bool = False) -> Callable[[Factory], Factory]:
+    """Register a factory under the name a pack writes in its ``factory`` field.
+
+    ``replaces=True`` marks a factory whose listener returns a
+    :class:`~tor.effects.hooks.ReplacementContribution` — it overwrites a value rather than
+    adding to one. Two such effects reaching the same hook for the same item type is a
+    content bug, which is what ``05.1.1`` check 5 exists to catch; the flag lives here, next
+    to the factory that does the replacing, so there is no parallel list to drift.
+    """
+
     def decorate(factory: Factory) -> Factory:
         _FACTORIES[name] = factory
+        if replaces:
+            _REPLACING.add(name)
         return factory
 
     return decorate
@@ -276,7 +289,7 @@ def enable_magical_success(
     return _effect(effect_id, kind, {Hook.MAGICAL_SUCCESS_ELIGIBLE: listen}, params)
 
 
-@register_factory("modify_piercing_threshold")
+@register_factory("modify_piercing_threshold", replaces=True)
 def modify_piercing_threshold(
     effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]
 ) -> Effect:
@@ -406,6 +419,9 @@ def _hook(params: Mapping[str, Any], effect_id: EffectId, default: Hook | None =
 # ----------------------------------------------------------------------------------
 
 EFFECT_FACTORIES: Mapping[str, Factory] = _FACTORIES
+
+#: The factories that replace a hook's value rather than adding to it (``05.1.1`` check 5).
+REPLACEMENT_FACTORIES: frozenset[str] = frozenset(_REPLACING)
 
 
 def build_effect(

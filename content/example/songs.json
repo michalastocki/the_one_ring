@@ -1,0 +1,5 @@
+{"songs": [
+  {"id": "example_lay", "title": "The Lay of the Example Field", "kind": "lay"},
+  {"id": "example_victory", "title": "How the Example Folk Came Home", "kind": "song_of_victory"},
+  {"id": "example_walking", "title": "A Walking-song for Level Roads", "kind": "walking_song"}
+]}

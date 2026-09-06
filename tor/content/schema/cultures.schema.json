@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/cultures.schema.json",
+  "title": "cultures.json (05.2)",
+  "type": "object",
+  "required": ["cultures"],
+  "additionalProperties": false,
+  "properties": {
+    "cultures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "cultural_blessing", "standard_of_living", "derived",
+          "attribute_sets", "skills", "favoured_skill_choices",
+          "distinctive_feature_choices"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "cultural_blessing": {
+            "type": "object",
+            "required": ["effect"],
+            "properties": {"effect": {"$ref": "common.schema.json#/$defs/id"}},
+            "additionalProperties": false
+          },
+          "cultural_weakness": {
+            "type": "object",
+            "required": ["effect"],
+            "properties": {"effect": {"$ref": "common.schema.json#/$defs/id"}},
+            "additionalProperties": false
+          },
+          "standard_of_living": {"$ref": "common.schema.json#/$defs/standardOfLiving"},
+          "eye_awareness_weight": {"type": "integer"},
+          "derived": {
+            "type": "object",
+            "required": ["endurance_bonus", "hope_bonus", "parry_bonus"],
+            "properties": {
+              "endurance_bonus": {"type": "integer"},
+              "hope_bonus": {"type": "integer"},
+              "parry_bonus": {"type": "integer"}
+            },
+            "additionalProperties": false
+          },
+          "attribute_bonus": {
+            "type": ["object", "null"],
+            "properties": {
+              "count": {"type": "integer", "minimum": 1},
+              "choose": {"type": "string"}
+            },
+            "additionalProperties": false
+          },
+          "attribute_sets": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "required": ["roll", "strength", "heart", "wits"],
+              "properties": {
+                "roll": {"type": "integer", "minimum": 1, "maximum": 6},
+                "strength": {"type": "integer", "minimum": 1},
+                "heart": {"type": "integer", "minimum": 1},
+                "wits": {"type": "integer", "minimum": 1}
+              },
+              "additionalProperties": false
+            }
+          },
+          "skills": {
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 6}
+          },
+          "favoured_skill_choices": {"$ref": "common.schema.json#/$defs/idList"},
+          "favoured_skill_count": {"type": "integer", "minimum": 0},
+          "combat_proficiencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["choose", "rating"],
+              "properties": {
+                "rating": {"type": "integer", "minimum": 0, "maximum": 6},
+                "choose": {
+                  "oneOf": [
+                    {"$ref": "common.schema.json#/$defs/idList"},
+                    {"type": "string", "const": "any"}
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "distinctive_feature_choices": {"$ref": "common.schema.json#/$defs/idList"},
+          "distinctive_feature_count": {"type": "integer", "minimum": 0},
+          "allowed_weapons": {
+            "oneOf": [{"$ref": "common.schema.json#/$defs/idList"}, {"type": "null"}]
+          },
+          "forbidden_items": {"$ref": "common.schema.json#/$defs/idList"},
+          "languages": {"type": "array", "items": {"type": "string"}},
+          "typical_names": {"type": "object"},
+          "adventuring_age": {
+            "type": "object",
+            "properties": {
+              "min": {"type": "integer"},
+              "max": {"type": "integer"},
+              "typical_retirement": {"type": "integer"}
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  }
+}

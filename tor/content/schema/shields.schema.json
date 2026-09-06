@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/shields.schema.json",
+  "title": "shields.json (05.5)",
+  "type": "object",
+  "required": ["shields"],
+  "additionalProperties": false,
+  "properties": {
+    "shields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "parry_bonus", "load"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "parry_bonus": {"type": "integer", "minimum": 0},
+          "load": {"type": "integer", "minimum": 0},
+          "min_standard_of_living": {
+            "oneOf": [
+              {"$ref": "common.schema.json#/$defs/standardOfLiving"},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    }
+  }
+}

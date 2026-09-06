@@ -10,7 +10,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
+    # 05.1: pack files are validated against the JSON Schemas in tor/content/schema/.
     "jsonschema>=4.21",
+    # jsonschema's own $ref resolver, used to register the shipped schemas offline.
+    "referencing>=0.33",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +24,7 @@ dev = [
     "import-linter>=2.0",
     "mypy>=1.9",
     "ruff>=0.4",
+    "types-jsonschema>=4.21",
 ]
 
 [project.scripts]

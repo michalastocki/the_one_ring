@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/common.schema.json",
+  "title": "Shared definitions",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$",
+      "description": "snake_case, ASCII, stable forever (20.11)."
+    },
+    "idList": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+    "standardOfLiving": {
+      "type": "string",
+      "enum": ["poor", "frugal", "common", "prosperous", "rich", "very_rich"]
+    },
+    "params": {"type": "object"},
+    "effect": {
+      "type": "object",
+      "required": ["id", "factory"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string"},
+        "factory": {"type": "string"},
+        "kind": {"type": "string"},
+        "params": {"$ref": "#/$defs/params"},
+        "repeatable": {"type": "boolean"},
+        "applies_to": {"type": "array", "items": {"type": "string"}},
+        "item_types": {"type": "array", "items": {"type": "string"}},
+        "culture": {"$ref": "#/$defs/id"},
+        "min_wisdom": {"type": "integer", "minimum": 0},
+        "craftsmanship": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["elven", "dwarven", "numenorean"]}
+        },
+        "requires_bane": {"type": "boolean"},
+        "supersedes": {"$ref": "#/$defs/id"},
+        "requires_choice": {"type": "object"},
+        "deprecated": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

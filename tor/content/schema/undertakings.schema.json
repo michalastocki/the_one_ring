@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/undertakings.schema.json",
+  "title": "undertakings.json (15.5)",
+  "type": "object",
+  "required": ["undertakings"],
+  "additionalProperties": false,
+  "properties": {
+    "undertakings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "yule_only": {"type": "boolean"},
+          "description": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{"curses": [
+  {"id": "example_weakening", "name": "Weakening",
+   "factory": "numeric_modifier", "requires_choice": {"attribute": 1},
+   "params": {"hook": "MODIFY_ATTRIBUTE_TN", "delta": 2}},
+
+  {"id": "example_ill_omen", "name": "Ill-omen",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_COUNCIL_ROLL", "delta": -1}}
+]}

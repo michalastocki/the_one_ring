@@ -1,0 +1,5 @@
+{"conditions": [
+  {"id": "example_overburdened_by_shadow", "name": "Overburdened by Shadow",
+   "factory": "ill_favour_when_applicable",
+   "params": {"flag": "shadow_at_maximum"}}
+]}
