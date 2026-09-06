@@ -24,6 +24,7 @@ __all__ = [
     "SUCCESS_DOMAIN",
     "DieKind",
     "LookupTable",
+    "Sentinel",
     "TableRow",
 ]
 
@@ -37,6 +38,39 @@ SUCCESS_DOMAIN: frozenset[int] = frozenset(range(1, 7))
 
 #: Guard against a content pack whose reroll rows point back at themselves.
 _MAX_REROLL_DEPTH = 8
+
+
+class Sentinel(StrEnum):
+    """Placeholders a pack may write inside a row ``value`` (``05.6``).
+
+    ``"$roll"`` means "the numeric die result itself" — the Wound Severity table's injury
+    days and the Endurance Loss table's loss both use it. The loader converts the literal
+    string into this marker so a consuming subsystem can test identity rather than sniff
+    for a magic string. It is still a ``str``, so a row round-trips through JSON unchanged.
+    """
+
+    ROLL = "$roll"
+
+
+def _mark_sentinels(value: object, _seen: frozenset[int] = frozenset()) -> object:
+    """Rewrite the ``"$roll"`` literal to :data:`Sentinel.ROLL`, at any depth.
+
+    ``_seen`` guards against a container that holds itself. Decoded JSON never can, but a
+    reroll chain is re-parsed from values already in memory, and a hand-built cycle would
+    otherwise recurse until the interpreter gave up. A cycle is returned untouched so the
+    reroll depth guard is the one that reports it.
+    """
+    if isinstance(value, str):
+        return Sentinel.ROLL if value == Sentinel.ROLL.value else value
+    if id(value) in _seen:
+        return value
+    if isinstance(value, dict):
+        seen = _seen | {id(value)}
+        return {key: _mark_sentinels(item, seen) for key, item in value.items()}
+    if isinstance(value, list):
+        seen = _seen | {id(value)}
+        return [_mark_sentinels(item, seen) for item in value]
+    return value
 
 
 class DieKind(StrEnum):
@@ -208,23 +242,24 @@ def rows_from_json(
             raise ContentError(
                 "a table row needs both 'match' and 'value'", pointer=pointer, entity_id=table_id
             )
+        value = _mark_sentinels(row["value"])
         match raw_match := row["match"]:
             case "eye":
-                parsed.append(TableRow(FeatFace.EYE, row["value"]))
+                parsed.append(TableRow(FeatFace.EYE, value))
             case "rune":
-                parsed.append(TableRow(FeatFace.RUNE, row["value"]))
+                parsed.append(TableRow(FeatFace.RUNE, value))
             case bool():
                 raise ContentError(
                     f"invalid row match {raw_match!r}", pointer=pointer, entity_id=table_id
                 )
             case int():
-                parsed.append(TableRow(raw_match, row["value"]))
+                parsed.append(TableRow(raw_match, value))
             case [int() as low, int() as high]:
                 if low > high:
                     raise ContentError(
                         f"range [{low}, {high}] is inverted", pointer=pointer, entity_id=table_id
                     )
-                parsed.append(TableRow((low, high), row["value"]))
+                parsed.append(TableRow((low, high), value))
             case _:
                 raise ContentError(
                     f"invalid row match {raw_match!r}; expected an int, a [low, high] pair, "

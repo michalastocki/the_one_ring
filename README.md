@@ -54,6 +54,12 @@ Build steps 1–6 of the order in `00-README.md` §5 are complete: `tor.dice`, `
 the pure core and all three seams; the rules subsystems (steps 7–15), the session layer,
 and the API and CLI are not yet implemented.
 
+Content packs are validated in two passes. The JSON Schemas in `tor/content/schema/` check
+shape — required fields, types, enumerated values, arity, and any field the format does not
+define; `05.1.1`'s referential and semantic checks then run over the merged stack. The
+schemas own everything a schema can express, so the loader holds no second implementation
+of the same rule.
+
 One deliberate deviation from the spec is recorded in `tor/rolls.py`: `01.1` lists
 `tor.rolls`, `tor.effects` and `tor.tables` as independent siblings, while `02.3.1` puts
 `build_request` in `tor.rolls` and has it read the `EffectBus`. Both cannot hold, so

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/skills.schema.json",
+  "title": "skills.json (05.1) — display-name overrides only",
+  "description": "The 18-skill grid is engine-fixed (tor.model.abilities); a pack may only rename.",
+  "type": "object",
+  "required": ["skills"],
+  "additionalProperties": false,
+  "properties": {
+    "skills": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  }
+}

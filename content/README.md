@@ -14,17 +14,31 @@ directory and validated against the schemas in `tor/content/schema/` at load tim
 ## Authoring a pack
 
 Copy `example/` as a skeleton and replace the entries. `05-content-schemas.md` documents
-every file and field; the JSON Schemas enforce them. Then:
+every file and field; the JSON Schemas in `tor/content/schema/` enforce their shape.
+
+Only `pack.json` is required. Every other file is optional, which is what lets a
+supplement carry just the entries it adds. Effects may be written in any of thirteen
+files, one per `EffectKind` — `virtues.json`, `cultural_virtues.json`, `rewards.json`,
+`enchanted_rewards.json`, `distinctive_features.json`, `flaws.json`, `fell_abilities.json`,
+`cultural_blessings.json`, `patron_benefits.json`, `item_blessings.json`, `curses.json`,
+`conditions.json`, `undertaking_benefits.json` — and all land in one namespace, because
+effect ids are globally unique. `skills.json` overrides Skill *display names* only: the
+18-skill grid is engine knowledge, so a pack may rename a Skill but never add one.
+
+Then:
 
 ```bash
 python -c "from pathlib import Path; from tor.content import load_pack; \
            load_pack(Path('content/mypack'))"
 ```
 
-Loading validates eagerly and totally: a missing field, a reference to an id that does not
-exist, or a lookup table with a gap in its key domain raises `ContentError` naming the
-file, a JSON pointer to the offending node, and the entity id. A malformed pack fails at
-load, never mid-session.
+Loading validates eagerly and totally, in two passes. The JSON Schemas check *shape* —
+required fields, types, enumerated values, arity, and any field the format does not define,
+so a typo is an error rather than a silently ignored key. Then the referential and semantic
+checks of `05.1.1` run: a reference to an id that does not exist, a lookup table with a gap
+in its key domain, a Cultural Virtue naming no culture. Either pass raises `ContentError`
+naming the file, a JSON pointer to the offending node, and the entity id. A malformed pack
+fails at load, never mid-session.
 
 ## Ids
 

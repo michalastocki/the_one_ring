@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/names.schema.json",
+  "title": "names/<culture-id>.json — per-culture name lists",
+  "type": "object",
+  "minProperties": 1,
+  "additionalProperties": {
+    "type": "array",
+    "items": {"type": "string", "minLength": 1}
+  }
+}

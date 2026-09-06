@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/shadow_paths.schema.json",
+  "title": "shadow_paths.json (11.7)",
+  "type": "object",
+  "required": ["shadow_paths"],
+  "additionalProperties": false,
+  "properties": {
+    "shadow_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "calling", "steps"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "calling": {"$ref": "common.schema.json#/$defs/id"},
+          "steps": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {"$ref": "common.schema.json#/$defs/id"}
+          }
+        }
+      }
+    }
+  }
+}

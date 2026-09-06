@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/weapons.schema.json",
+  "title": "weapons.json (05.4)",
+  "type": "object",
+  "required": ["weapons"],
+  "additionalProperties": false,
+  "properties": {
+    "weapons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "damage", "injury", "load", "proficiency"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "damage": {"type": "integer", "minimum": 0},
+          "injury": {
+            "type": "object",
+            "properties": {
+              "one_handed": {"type": ["integer", "null"]},
+              "two_handed": {"type": ["integer", "null"]}
+            },
+            "additionalProperties": false
+          },
+          "load": {"type": "integer", "minimum": 0},
+          "proficiency": {"$ref": "common.schema.json#/$defs/id"},
+          "ranged": {"type": "boolean"},
+          "throwable": {"type": "boolean"},
+          "two_handed_only": {"type": "boolean"},
+          "can_cause_piercing_blow": {"type": "boolean"},
+          "notes": {"type": "string"}
+        }
+      }
+    }
+  }
+}

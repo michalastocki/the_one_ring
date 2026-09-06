@@ -1,0 +1,5 @@
+{"undertaking_benefits": [
+  {"id": "example_strengthen_fellowship", "name": "Strengthen the Fellowship",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_FELLOWSHIP_RATING", "delta": 1}}
+]}

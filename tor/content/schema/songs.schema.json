@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/songs.schema.json",
+  "title": "songs.json (15.8) — titles a Company may start with or draw on",
+  "type": "object",
+  "required": ["songs"],
+  "additionalProperties": false,
+  "properties": {
+    "songs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "title": {"type": "string", "minLength": 1},
+          "kind": {
+            "type": "string",
+            "enum": ["lay", "song_of_victory", "walking_song"]
+          }
+        }
+      }
+    }
+  }
+}

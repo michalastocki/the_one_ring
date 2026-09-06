@@ -34,6 +34,7 @@ from tor.effects.hooks import (
 )
 from tor.effects.library import (
     EFFECT_FACTORIES,
+    REPLACEMENT_FACTORIES,
     build_effect,
     build_predicate,
     register_factory,
@@ -42,6 +43,7 @@ from tor.effects.library import (
 __all__ = [
     "DEFAULT_ENVIRONMENT",
     "EFFECT_FACTORIES",
+    "REPLACEMENT_FACTORIES",
     "ActionContribution",
     "Contribution",
     "Effect",

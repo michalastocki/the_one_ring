@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/pack.schema.json",
+  "title": "pack.json — the manifest",
+  "type": "object",
+  "required": ["id", "name"],
+  "properties": {
+    "id": {"$ref": "common.schema.json#/$defs/id"},
+    "name": {"type": "string"},
+    "version": {"type": ["string", "number"]},
+    "description": {"type": "string"},
+    "overrides": {"$ref": "common.schema.json#/$defs/idList"}
+  },
+  "additionalProperties": false
+}

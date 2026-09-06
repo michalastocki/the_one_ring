@@ -14,6 +14,7 @@ from tor.content.entities import (
     Manifest,
     Patron,
     ShadowPath,
+    SongTemplate,
     StandardOfLivingTier,
     Undertaking,
 )
@@ -73,6 +74,10 @@ class ContentPack:
     undertakings: Mapping[str, Undertaking] = field(default_factory=dict)
     tables: Mapping[str, LookupTable[Any]] = field(default_factory=dict)
     names: Mapping[str, Mapping[str, tuple[str, ...]]] = field(default_factory=dict)
+    songs: Mapping[str, SongTemplate] = field(default_factory=dict)
+    #: Display-name overrides only; the 18-skill grid itself is engine-fixed
+    #: (``tor.model.abilities``), so a pack may rename a Skill but never add one.
+    skill_names: Mapping[str, str] = field(default_factory=dict)
 
     def merge(self, other: ContentPack) -> ContentPack:
         """Layer ``other`` over this pack (``05.1``)."""
@@ -91,6 +96,8 @@ class ContentPack:
             "undertakings",
             "tables",
             "names",
+            "songs",
+            "skill_names",
         ):
             sections[name] = _merge_section(
                 getattr(self, name), getattr(other, name), allowed=allowed, section=name
@@ -117,6 +124,9 @@ class ContentPack:
 
     def table(self, table_id: str) -> LookupTable[Any]:
         return _require(self.tables, table_id, "table")
+
+    def song(self, song_id: str) -> SongTemplate:
+        return _require(self.songs, song_id, "song")
 
     def effects_of_kind(self, kind: str) -> dict[str, EffectDefinition]:
         return {k: v for k, v in self.effects.items() if v.kind == kind}

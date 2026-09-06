@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/armour.schema.json",
+  "title": "armour.json (05.5) — body armour and helms in one file",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "armour": {"$ref": "#/$defs/pieces"},
+    "helms": {"$ref": "#/$defs/pieces"}
+  },
+  "$defs": {
+    "pieces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "protection", "load", "category"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "name": {"type": "string"},
+          "protection": {"type": "integer", "minimum": 0},
+          "load": {"type": "integer", "minimum": 0},
+          "category": {"type": "string", "enum": ["leather", "mail", "headgear"]},
+          "min_standard_of_living": {
+            "oneOf": [
+              {"$ref": "common.schema.json#/$defs/standardOfLiving"},
+              {"type": "null"}
+            ]
+          },
+          "removable_in_combat": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

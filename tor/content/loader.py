@@ -23,18 +23,24 @@ from tor.content.entities import (
     Patron,
     ProficiencyGrant,
     ShadowPath,
+    SongTemplate,
     StandardOfLivingTier,
     Undertaking,
 )
 from tor.content.pack import ContentPack
+from tor.content.schema import schema_for, validate_document
 from tor.effects.hooks import Hook
-from tor.effects.library import EFFECT_FACTORIES
+from tor.effects.library import (
+    EFFECT_FACTORIES,
+    REPLACEMENT_FACTORIES,
+    build_effect,
+)
 from tor.errors import ContentError
-from tor.model.abilities import COMBAT_PROFICIENCIES, SKILLS, VALOUR, WISDOM
+from tor.model.abilities import COMBAT_PROFICIENCIES, SKILLS, VALOUR, WISDOM, is_skill
 from tor.model.conditions import DriveKind, StandardOfLiving
 from tor.model.gear import ArmourCategory, ArmourType, Craftsmanship, ShieldType, WeaponType
 from tor.model.ids import AbilityId, AdversaryId, CallingId, CultureId, EffectId, ItemId
-from tor.tables import DieKind, LookupTable, rows_from_json
+from tor.tables import LookupTable, rows_from_json
 
 __all__ = ["load_pack", "load_packs"]
 
@@ -53,6 +59,13 @@ _EFFECT_FILES: Mapping[str, str] = {
     "fell_abilities.json": "fell_ability",
     "cultural_blessings.json": "cultural_blessing",
     "patron_benefits.json": "patron_benefit",
+    # The four kinds 04.1 names that had no file to be written in. Item blessings and
+    # curses are central to 13; conditions are how a state like being poisoned reaches
+    # the rest hooks (16.4.5) without one subsystem importing another.
+    "item_blessings.json": "item_blessing",
+    "curses.json": "curse",
+    "conditions.json": "condition",
+    "undertaking_benefits.json": "undertaking_benefit",
 }
 
 
@@ -77,6 +90,8 @@ def load_pack(path: Path, *, strict: bool = True) -> ContentPack:
         undertakings=_undertakings(path),
         tables=_tables(path),
         names=_names(path),
+        songs=_songs(path),
+        skill_names=_skill_names(path),
     )
     if strict:
         validate(pack, path)
@@ -100,12 +115,22 @@ def load_packs(paths: Sequence[Path], *, strict: bool = True) -> ContentPack:
 # ----------------------------------------------------------------------------------
 
 
-def _read(path: Path, name: str, *, required: bool = True) -> dict[str, Any]:
+def _read(
+    path: Path, name: str, *, required: bool = True, schema: str | None = None
+) -> dict[str, Any]:
     file = path / name
     if not file.exists():
         if required:
             raise ContentError(f"content pack is missing {name}", file=file)
         return {}
+    loaded = _decode(file, name)
+    if (schema_name := schema or schema_for(name)) is not None:
+        validate_document(loaded, schema_name=schema_name, file=file)
+    return loaded
+
+
+def _decode(file: Path, name: str) -> dict[str, Any]:
+    """Read one JSON object, failing loudly on a syntax error or a bare array."""
     try:
         loaded = json.loads(file.read_text())
     except json.JSONDecodeError as exc:
@@ -115,25 +140,14 @@ def _read(path: Path, name: str, *, required: bool = True) -> dict[str, Any]:
     return loaded
 
 
-def _rows(data: Mapping[str, Any], key: str, file: Path) -> list[dict[str, Any]]:
-    rows = data.get(key, [])
-    if not isinstance(rows, list):
-        raise ContentError(f"'{key}' must be an array", file=file, pointer=f"/{key}")
+def _rows(data: Mapping[str, Any], key: str, _file: Path) -> list[dict[str, Any]]:
+    """One section's rows. The schema has already guaranteed the shape."""
+    rows: list[dict[str, Any]] = data.get(key, [])
     return rows
-
-
-def _enum(value: Any, enum_type: type, *, what: str, entity_id: str) -> Any:
-    try:
-        return enum_type(value)
-    except ValueError as exc:
-        raise ContentError(f"unknown {what}: {value!r}", entity_id=entity_id) from exc
 
 
 def _manifest(path: Path) -> Manifest:
     data = _read(path, "pack.json")
-    for required in ("id", "name"):
-        if required not in data:
-            raise ContentError(f"pack.json needs '{required}'", file=path / "pack.json")
     return Manifest(
         id=str(data["id"]),
         name=str(data["name"]),
@@ -146,28 +160,16 @@ def _cultures(path: Path) -> dict[str, Culture]:
     file = path / "cultures.json"
     data = _read(path, "cultures.json", required=False)
     out: dict[str, Culture] = {}
-    for index, row in enumerate(_rows(data, "cultures", file)):
-        at = f"/cultures/{index}"
-        cid = str(row.get("id", ""))
-        if not cid:
-            raise ContentError("a culture needs an 'id'", file=file, pointer=at)
-        derived = row.get("derived", {})
-        for key in ("endurance_bonus", "hope_bonus", "parry_bonus"):
-            if key not in derived:
-                raise ContentError(
-                    f"culture 'derived' needs {key!r}; these vary per culture and must "
-                    "never be defaulted",
-                    file=file,
-                    pointer=f"{at}/derived",
-                    entity_id=cid,
-                )
+    for row in _rows(data, "cultures", file):
+        cid = str(row["id"])
+        derived = row["derived"]
         blessing = row.get("cultural_blessing", {})
         out[cid] = Culture(
             id=CultureId(cid),
             name=str(row.get("name", cid)),
             cultural_blessing=EffectId(str(blessing.get("effect", ""))),
             cultural_weakness=_opt_effect((row.get("cultural_weakness") or {}).get("effect")),
-            standard_of_living=_sol_of(row.get("standard_of_living"), entity_id=cid),
+            standard_of_living=_sol(row["standard_of_living"]),
             derived=CultureDerived(
                 endurance_bonus=int(derived["endurance_bonus"]),
                 hope_bonus=int(derived["hope_bonus"]),
@@ -229,22 +231,12 @@ def _sol(value: Any) -> StandardOfLiving:
     return StandardOfLiving[str(value).upper()]
 
 
-def _sol_of(value: Any, *, entity_id: str) -> StandardOfLiving:
-    try:
-        return _sol(value)
-    except KeyError as exc:
-        raise ContentError(f"unknown standard of living {value!r}", entity_id=entity_id) from exc
-
-
 def _callings(path: Path) -> dict[str, Calling]:
     file = path / "callings.json"
     data = _read(path, "callings.json", required=False)
     out: dict[str, Calling] = {}
-    for index, row in enumerate(_rows(data, "callings", file)):
-        at = f"/callings/{index}"
-        cid = str(row.get("id", ""))
-        if not cid:
-            raise ContentError("a calling needs an 'id'", file=file, pointer=at)
+    for row in _rows(data, "callings", file):
+        cid = str(row["id"])
         feature = row.get("distinctive_feature", {})
         out[cid] = Calling(
             id=CallingId(cid),
@@ -265,10 +257,8 @@ def _weapons(path: Path) -> dict[str, WeaponType]:
     file = path / "weapons.json"
     data = _read(path, "weapons.json", required=False)
     out: dict[str, WeaponType] = {}
-    for index, row in enumerate(_rows(data, "weapons", file)):
-        wid = str(row.get("id", ""))
-        if not wid:
-            raise ContentError("a weapon needs an 'id'", file=file, pointer=f"/weapons/{index}")
+    for row in _rows(data, "weapons", file):
+        wid = str(row["id"])
         injury = row.get("injury", {})
         out[wid] = WeaponType(
             id=ItemId(wid),
@@ -291,24 +281,15 @@ def _armour(path: Path) -> dict[str, ArmourType]:
     data = _read(path, "armour.json", required=False)
     out: dict[str, ArmourType] = {}
     for key in ("armour", "helms"):
-        for index, row in enumerate(_rows(data, key, file)):
-            aid = str(row.get("id", ""))
-            if not aid:
-                raise ContentError(
-                    "an armour entry needs an 'id'", file=file, pointer=f"/{key}/{index}"
-                )
+        for row in _rows(data, key, file):
+            aid = str(row["id"])
             minimum = row.get("min_standard_of_living")
             out[aid] = ArmourType(
                 id=ItemId(aid),
                 name=str(row.get("name", aid)),
                 protection=int(row.get("protection", 0)),
                 load=int(row.get("load", 0)),
-                category=_enum(
-                    row.get("category", "leather"),
-                    ArmourCategory,
-                    what="armour category",
-                    entity_id=aid,
-                ),
+                category=ArmourCategory(row["category"]),
                 min_standard_of_living=None if minimum is None else _sol(minimum),
                 removable_in_combat=bool(row.get("removable_in_combat", True)),
             )
@@ -319,10 +300,8 @@ def _shields(path: Path) -> dict[str, ShieldType]:
     file = path / "shields.json"
     data = _read(path, "shields.json", required=False)
     out: dict[str, ShieldType] = {}
-    for index, row in enumerate(_rows(data, "shields", file)):
-        sid = str(row.get("id", ""))
-        if not sid:
-            raise ContentError("a shield needs an 'id'", file=file, pointer=f"/shields/{index}")
+    for row in _rows(data, "shields", file):
+        sid = str(row["id"])
         minimum = row.get("min_standard_of_living")
         out[sid] = ShieldType(
             id=ItemId(sid),
@@ -338,15 +317,13 @@ def _effects(path: Path) -> dict[str, EffectDefinition]:
     out: dict[str, EffectDefinition] = {}
     for filename, default_kind in _EFFECT_FILES.items():
         file = path / filename
-        data = _read(path, filename, required=False)
+        data = _read(path, filename, required=False, schema="effects.schema.json")
         if not data:
             continue
         section = next(iter(data)) if data else ""
         for index, row in enumerate(_rows(data, section, file)):
             at = f"/{section}/{index}"
-            eid = str(row.get("id", ""))
-            if not eid:
-                raise ContentError("an effect needs an 'id'", file=file, pointer=at)
+            eid = str(row["id"])
             if eid in out:
                 raise ContentError(
                     f"duplicate effect id {eid!r} in {filename}",
@@ -364,10 +341,7 @@ def _effects(path: Path) -> dict[str, EffectDefinition]:
                 applies_to=tuple(row.get("applies_to", ())),
                 culture=_opt_culture(row.get("culture")),
                 min_wisdom=int(row.get("min_wisdom", 0)),
-                craftsmanship=tuple(
-                    _enum(c, Craftsmanship, what="craftsmanship", entity_id=eid)
-                    for c in row.get("craftsmanship", ())
-                ),
+                craftsmanship=tuple(Craftsmanship(c) for c in row.get("craftsmanship", ())),
                 item_types=tuple(row.get("item_types", ())),
                 requires_bane=bool(row.get("requires_bane", False)),
                 supersedes=_opt_effect(row.get("supersedes")),
@@ -381,12 +355,8 @@ def _shadow_paths(path: Path) -> dict[str, ShadowPath]:
     file = path / "shadow_paths.json"
     data = _read(path, "shadow_paths.json", required=False)
     out: dict[str, ShadowPath] = {}
-    for index, row in enumerate(_rows(data, "shadow_paths", file)):
-        pid = str(row.get("id", ""))
-        if not pid:
-            raise ContentError(
-                "a shadow path needs an 'id'", file=file, pointer=f"/shadow_paths/{index}"
-            )
+    for row in _rows(data, "shadow_paths", file):
+        pid = str(row["id"])
         out[pid] = ShadowPath(
             id=pid,
             calling=CallingId(str(row.get("calling", ""))),
@@ -399,11 +369,8 @@ def _adversaries(path: Path) -> dict[str, Adversary]:
     file = path / "adversaries.json"
     data = _read(path, "adversaries.json", required=False)
     out: dict[str, Adversary] = {}
-    for index, row in enumerate(_rows(data, "adversaries", file)):
-        at = f"/adversaries/{index}"
-        aid = str(row.get("id", ""))
-        if not aid:
-            raise ContentError("an adversary needs an 'id'", file=file, pointer=at)
+    for row in _rows(data, "adversaries", file):
+        aid = str(row["id"])
         drive = row.get("drive", {})
         out[aid] = Adversary(
             id=AdversaryId(aid),
@@ -411,9 +378,7 @@ def _adversaries(path: Path) -> dict[str, Adversary]:
             attribute_level=int(row.get("attribute_level", 0)),
             endurance=int(row.get("endurance", 0)),
             might=int(row.get("might", 1)),
-            drive_kind=_enum(
-                drive.get("kind", "hate"), DriveKind, what="drive kind", entity_id=aid
-            ),
+            drive_kind=DriveKind(drive["kind"]),
             drive=int(drive.get("value", 0)),
             parry=int(row.get("parry", 0)),
             armour=int(row.get("armour", 0)),
@@ -432,10 +397,8 @@ def _patrons(path: Path) -> dict[str, Patron]:
     file = path / "patrons.json"
     data = _read(path, "patrons.json", required=False)
     out: dict[str, Patron] = {}
-    for index, row in enumerate(_rows(data, "patrons", file)):
-        pid = str(row.get("id", ""))
-        if not pid:
-            raise ContentError("a patron needs an 'id'", file=file, pointer=f"/patrons/{index}")
+    for row in _rows(data, "patrons", file):
+        pid = str(row["id"])
         out[pid] = Patron(
             id=pid,
             name=str(row.get("name", pid)),
@@ -470,12 +433,8 @@ def _undertakings(path: Path) -> dict[str, Undertaking]:
     file = path / "undertakings.json"
     data = _read(path, "undertakings.json", required=False)
     out: dict[str, Undertaking] = {}
-    for index, row in enumerate(_rows(data, "undertakings", file)):
-        uid = str(row.get("id", ""))
-        if not uid:
-            raise ContentError(
-                "an undertaking needs an 'id'", file=file, pointer=f"/undertakings/{index}"
-            )
+    for row in _rows(data, "undertakings", file):
+        uid = str(row["id"])
         out[uid] = Undertaking(
             id=uid,
             name=str(row.get("name", uid)),
@@ -491,24 +450,37 @@ def _tables(path: Path) -> dict[str, LookupTable[Any]]:
     if not directory.is_dir():
         return out
     for file in sorted(directory.glob("*.json")):
-        try:
-            data = json.loads(file.read_text())
-        except json.JSONDecodeError as exc:
-            raise ContentError(f"{file.name} is not valid JSON: {exc.msg}", file=file) from exc
+        data = _decode(file, file.name)
+        validate_document(data, schema_name="table.schema.json", file=file)
         tid = str(data.get("id", file.stem))
-        die = str(data.get("die", "feat"))
-        if die not in {DieKind.FEAT, DieKind.SUCCESS}:
-            raise ContentError(
-                f"table 'die' must be 'feat' or 'success', got {die!r}",
-                file=file,
-                pointer="/die",
-                entity_id=tid,
-            )
+        die = str(data["die"])
         # LookupTable validates total coverage eagerly, so a gap fails here (05.1.1 #4).
         out[tid] = LookupTable(
             id=tid, die=die, rows=rows_from_json(data.get("rows", []), table_id=tid)
         )
     return out
+
+
+def _songs(path: Path) -> dict[str, SongTemplate]:
+    """``songs.json`` (``15.8``) — the stock of songs a Company may draw on."""
+    data = _read(path, "songs.json", required=False)
+    out: dict[str, SongTemplate] = {}
+    for row in _rows(data, "songs", path / "songs.json"):
+        sid = str(row["id"])
+        out[sid] = SongTemplate(id=sid, title=str(row["title"]), kind=str(row["kind"]))
+    return out
+
+
+def _skill_names(path: Path) -> dict[str, str]:
+    """``skills.json`` (``05.1``) — display-name overrides, never new Skills.
+
+    The grid is engine knowledge (``tor.model.abilities.SKILLS``); a pack that wants to
+    call ``scan`` something else may, but a pack that names an ability the engine does not
+    know is a :class:`ContentError` — caught by ``_check_abilities``.
+    """
+    data = _read(path, "skills.json", required=False)
+    names = data.get("skills", {})
+    return {str(key): str(value) for key, value in names.items()}
 
 
 def _names(path: Path) -> dict[str, dict[str, tuple[str, ...]]]:
@@ -517,8 +489,9 @@ def _names(path: Path) -> dict[str, dict[str, tuple[str, ...]]]:
     if not directory.is_dir():
         return out
     for file in sorted(directory.glob("*.json")):
-        data = json.loads(file.read_text())
-        out[file.stem] = {k: tuple(v) for k, v in data.items()}
+        data = _decode(file, file.name)
+        validate_document(data, schema_name="names.schema.json", file=file)
+        out[file.stem] = {key: tuple(value) for key, value in data.items()}
     return out
 
 
@@ -538,6 +511,7 @@ def validate(pack: ContentPack, path: Path) -> None:
     _check_abilities(pack, path)
     _check_culture_completeness(pack, path)
     _check_cultural_virtues(pack, path)
+    _check_replacement_effects(pack, path)
     _check_weapon_proficiencies(pack, path)
     _check_adversary_drive(pack, path)
     _check_standards_of_living(pack, path)
@@ -619,6 +593,15 @@ def _check_abilities(pack: ContentPack, path: Path) -> None:
                 require(grant.choose, owner=culture.id)
     for calling in pack.callings.values():
         require(calling.favoured_skill_choices, owner=calling.id)
+    # skills.json renames; it must not invent. Only a Skill may be renamed, not a Combat
+    # Proficiency or a rank — those are not in the 18-skill grid a pack may relabel.
+    for ability in pack.skill_names:
+        if not is_skill(AbilityId(ability)):
+            raise ContentError(
+                f"skills.json renames {ability!r}, which is not one of the 18 Skills",
+                file=path / "skills.json",
+                entity_id=ability,
+            )
 
 
 def _check_culture_completeness(pack: ContentPack, path: Path) -> None:
@@ -666,6 +649,57 @@ def _check_cultural_virtues(pack: ContentPack, path: Path) -> None:
             )
 
 
+def _supersession_root(effect_id: str, pack: ContentPack, path: Path) -> str:
+    """Follow ``supersedes`` to the head of the chain, refusing a cycle."""
+    root = effect_id
+    for _ in range(len(pack.effects) + 1):
+        definition = pack.effects.get(root)
+        if definition is None or not definition.supersedes:
+            return root
+        if definition.supersedes not in pack.effects:
+            raise ContentError(
+                f"effect {definition.id!r} supersedes unknown effect {definition.supersedes!r}",
+                file=path,
+                entity_id=definition.id,
+            )
+        root = definition.supersedes
+    raise ContentError(
+        f"effect {effect_id!r} is part of a 'supersedes' cycle", file=path, entity_id=effect_id
+    )
+
+
+def _check_replacement_effects(pack: ContentPack, path: Path) -> None:
+    """Check 5: two effects that *replace* a hook value cannot share one item type.
+
+    A replacing effect overwrites rather than adds, so two of them on one hook for one item
+    type has no defined answer. The legitimate case — Superior Keen standing in for Keen —
+    is exactly what ``supersedes`` declares, so effects on one supersession chain are one
+    slot and are allowed to coexist in a pack. Which of them applies to a given *item* is
+    ``13.7.3``'s business, not the loader's.
+    """
+    claimed: dict[tuple[Hook, str], tuple[str, str]] = {}
+    for definition in sorted(pack.effects.values(), key=lambda d: d.id):
+        if definition.factory not in REPLACEMENT_FACTORIES or definition.deprecated:
+            continue
+        effect = build_effect(
+            EffectId(definition.id), definition.kind, definition.factory, definition.params
+        )
+        root = _supersession_root(definition.id, pack, path)
+        item_types = definition.applies_to or definition.item_types or ("*",)
+        for hook in effect.listeners:
+            for item_type in item_types:
+                key = (hook, str(item_type))
+                if (previous := claimed.get(key)) is not None and previous[1] != root:
+                    raise ContentError(
+                        f"effects {previous[0]!r} and {definition.id!r} both replace "
+                        f"{hook.value} for item type {item_type!r}; one must declare "
+                        "'supersedes' naming the other",
+                        file=path,
+                        entity_id=definition.id,
+                    )
+                claimed.setdefault(key, (definition.id, root))
+
+
 def _check_weapon_proficiencies(pack: ContentPack, path: Path) -> None:
     """Check 8: a weapon's proficiency exists, or is the literal ``brawling``."""
     allowed = {*COMBAT_PROFICIENCIES, "brawling"}
@@ -681,18 +715,6 @@ def _check_weapon_proficiencies(pack: ContentPack, path: Path) -> None:
 def _check_adversary_drive(pack: ContentPack, path: Path) -> None:
     """Check 9: exactly one of hate / resolve, which the DriveKind discriminator gives."""
     for adversary in pack.adversaries.values():
-        if adversary.might < 1:
-            raise ContentError(
-                f"adversary {adversary.id!r} needs a Might of at least 1",
-                file=path,
-                entity_id=adversary.id,
-            )
-        if not adversary.attacks:
-            raise ContentError(
-                f"adversary {adversary.id!r} needs at least one attack",
-                file=path,
-                entity_id=adversary.id,
-            )
         for attack in adversary.attacks:
             if "heavy_blow" in attack.get("special_damage", ()):
                 raise ContentError(
@@ -704,7 +726,13 @@ def _check_adversary_drive(pack: ContentPack, path: Path) -> None:
 
 
 def _check_standards_of_living(pack: ContentPack, path: Path) -> None:
-    """Check 6: the tier ladder is complete and its thresholds ascend."""
+    """Check 6: the tier ladder is complete and its thresholds ascend.
+
+    This is the whole of check 6. "Every ``min_standard_of_living`` names a defined tier"
+    needs no separate pass: the readers resolve every such field through :func:`_sol_of`,
+    which rejects a name that is not a :class:`StandardOfLiving`, and the completeness
+    requirement below means every member of that enum is a declared tier.
+    """
     if not pack.standards_of_living:
         raise ContentError("standards_of_living.json defines no tiers", file=path)
     seen = {tier.tier for tier in pack.standards_of_living}
@@ -732,12 +760,4 @@ def _check_shadow_paths(pack: ContentPack, path: Path) -> None:
                 f"calling {calling.id!r} names unknown shadow path {calling.shadow_path!r}",
                 file=path,
                 entity_id=calling.id,
-            )
-    for shadow_path in pack.shadow_paths.values():
-        if len(shadow_path.steps) != 4:
-            raise ContentError(
-                f"shadow path {shadow_path.id!r} needs exactly four steps, got "
-                f"{len(shadow_path.steps)}",
-                file=path,
-                entity_id=shadow_path.id,
             )

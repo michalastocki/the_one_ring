@@ -27,6 +27,7 @@ __all__ = [
     "Patron",
     "ProficiencyGrant",
     "ShadowPath",
+    "SongTemplate",
     "StandardOfLivingTier",
     "Undertaking",
 ]
@@ -200,3 +201,18 @@ class Adversary:
 #: Gear types are reused from tor.model rather than re-declared: a WeaponType is the same
 #: object whether it came from a pack or was hand-built in a test.
 GearTypes = WeaponType | ArmourType | ShieldType
+
+
+@dataclass(frozen=True, slots=True)
+class SongTemplate:
+    """One authored song a Company may start with or draw on (``15.8``).
+
+    A Company's songs are written during a Fellowship Phase, so most are player-authored
+    at runtime; this is the pack-supplied stock. ``kind`` selects the venture the song
+    suits — a Lay for a Council, a Song of Victory for Combat, a Walking-song for a
+    Journey — and is the only mechanical field.
+    """
+
+    id: str
+    title: str
+    kind: str

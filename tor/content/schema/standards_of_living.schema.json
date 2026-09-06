@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-one-ring.invalid/schema/standards_of_living.schema.json",
+  "title": "standards_of_living.json (05.9)",
+  "type": "object",
+  "required": ["tiers"],
+  "additionalProperties": false,
+  "properties": {
+    "tiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "useful_items"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/standardOfLiving"},
+          "treasure_threshold": {"type": ["integer", "null"], "minimum": 0},
+          "useful_items": {"type": "integer", "minimum": 0},
+          "mount_vigour": {"type": ["integer", "null"]}
+        }
+      }
+    }
+  }
+}

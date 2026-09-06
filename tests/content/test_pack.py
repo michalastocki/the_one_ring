@@ -12,16 +12,19 @@ import shutil
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from tor.content import ContentPack, Manifest, load_pack, load_packs, parse_ops
 from tor.content.ops import OpKind, Who
+from tor.content.schema import SCHEMA_DIR, schema_for
+from tor.dice import FeatFace
 from tor.effects.bus import EffectKind
 from tor.effects.hooks import Hook
 from tor.effects.library import EFFECT_FACTORIES, build_effect
 from tor.errors import ContentError
 from tor.model.abilities import COMBAT_PROFICIENCIES, SKILLS
 from tor.model.conditions import DriveKind, StandardOfLiving
-from tor.tables import FEAT_DOMAIN, SUCCESS_DOMAIN, DieKind
+from tor.tables import FEAT_DOMAIN, SUCCESS_DOMAIN, DieKind, Sentinel
 
 EXAMPLE = Path(__file__).resolve().parents[2] / "content" / "example"
 
@@ -270,7 +273,7 @@ class TestLoadFailures:
 
     def test_a_manifest_without_an_id_is_rejected(self, scratch_pack: Path) -> None:
         (scratch_pack / "pack.json").write_text('{"name": "x"}')
-        with pytest.raises(ContentError, match="needs 'id'"):
+        with pytest.raises(ContentError, match="'id' is a required property"):
             load_pack(scratch_pack)
 
     def test_a_missing_derived_constant_is_rejected(self, scratch_pack: Path) -> None:
@@ -280,8 +283,9 @@ class TestLoadFailures:
             "cultures.json",
             lambda d: d["cultures"][0]["derived"].pop("parry_bonus"),
         )
-        with pytest.raises(ContentError, match="never be defaulted"):
+        with pytest.raises(ContentError, match="'parry_bonus' is a required property") as excinfo:
             load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/cultures/0/derived"
 
     def test_a_reference_to_a_missing_effect_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(
@@ -329,7 +333,19 @@ class TestLoadFailures:
             "cultures.json",
             lambda d: d["cultures"][0]["attribute_sets"].pop(),
         )
-        with pytest.raises(ContentError, match="exactly six attribute_sets"):
+        with pytest.raises(ContentError, match="is too short") as excinfo:
+            load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/cultures/0/attribute_sets"
+
+    def test_six_attribute_rows_keyed_wrongly_are_rejected(self, scratch_pack: Path) -> None:
+        # The schema counts the rows; only this check reads their 'roll' keys, so a
+        # culture with six rows keyed 1,1,2,3,4,5 gets past the schema and is caught here.
+        rewrite(
+            scratch_pack,
+            "cultures.json",
+            lambda d: d["cultures"][0]["attribute_sets"][1].update({"roll": 1}),
+        )
+        with pytest.raises(ContentError, match="attribute_sets keyed 1-6"):
             load_pack(scratch_pack)
 
     def test_a_cultural_virtue_without_a_culture_is_rejected(self, scratch_pack: Path) -> None:
@@ -373,13 +389,15 @@ class TestLoadFailures:
         rewrite(
             scratch_pack, "adversaries.json", lambda d: d["adversaries"][0].update({"attacks": []})
         )
-        with pytest.raises(ContentError, match="at least one attack"):
+        with pytest.raises(ContentError, match="should be non-empty") as excinfo:
             load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/adversaries/0/attacks"
 
     def test_a_shadow_path_with_three_steps_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(scratch_pack, "shadow_paths.json", lambda d: d["shadow_paths"][0]["steps"].pop())
-        with pytest.raises(ContentError, match="exactly four steps"):
+        with pytest.raises(ContentError, match="is too short") as excinfo:
             load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/shadow_paths/0/steps"
 
     def test_a_calling_naming_an_unknown_shadow_path_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(
@@ -417,8 +435,9 @@ class TestLoadFailures:
         data = json.loads(path.read_text())
         data["die"] = "d20"
         path.write_text(json.dumps(data))
-        with pytest.raises(ContentError, match="'feat' or 'success'"):
+        with pytest.raises(ContentError, match=r"not one of \['feat', 'success'\]") as excinfo:
             load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/die"
 
     def test_a_duplicate_effect_id_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(
@@ -431,8 +450,179 @@ class TestLoadFailures:
 
     def test_an_entry_without_an_id_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(scratch_pack, "weapons.json", lambda d: d["weapons"][0].pop("id"))
-        with pytest.raises(ContentError, match="needs an 'id'"):
+        with pytest.raises(ContentError, match="'id' is a required property") as excinfo:
             load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/weapons/0"
+
+
+class TestSchemaValidation:
+    """05.1 — pack files are checked against the JSON Schemas in tor/content/schema/.
+
+    The schema owns *shape*: required fields, types, enumerated values, arity, and — new
+    with the schemas — rejecting a field the format does not define, which no hand-rolled
+    guard ever caught. What a schema cannot express is 05.1.1's referential and semantic
+    pass, which runs after.
+    """
+
+    def test_a_schema_governs_every_pack_file(self) -> None:
+        # A file the loader reads but no schema governs would be validated by nothing.
+        for name in (
+            "pack.json",
+            "cultures.json",
+            "callings.json",
+            "skills.json",
+            "weapons.json",
+            "armour.json",
+            "shields.json",
+            "shadow_paths.json",
+            "adversaries.json",
+            "patrons.json",
+            "standards_of_living.json",
+            "undertakings.json",
+            "songs.json",
+        ):
+            assert schema_for(name) is not None, name
+        assert schema_for("tables/") == "table.schema.json"
+        assert schema_for("names/") == "names.schema.json"
+        # The nine effect files share one shape, so the loader passes their schema
+        # explicitly rather than deriving it from nine near-identical map entries.
+        assert schema_for("virtues.json") is None
+
+    def test_every_shipped_schema_is_itself_valid(self) -> None:
+        for file in sorted(SCHEMA_DIR.glob("*.schema.json")):
+            Draft202012Validator.check_schema(json.loads(file.read_text()))
+
+    def test_an_undefined_field_is_rejected(self, scratch_pack: Path) -> None:
+        # additionalProperties: false. A typo used to be silently ignored.
+        rewrite(scratch_pack, "weapons.json", lambda d: d["weapons"][0].update({"dammage": 3}))
+        with pytest.raises(ContentError, match="Additional properties are not allowed"):
+            load_pack(scratch_pack)
+
+    def test_an_id_that_is_not_snake_case_is_rejected(self, scratch_pack: Path) -> None:
+        # 20.11: ids are snake_case ASCII and are the contract between engine and pack.
+        rewrite(
+            scratch_pack,
+            "undertakings.json",
+            lambda d: d["undertakings"][0].update({"id": "Gather Rumours"}),
+        )
+        with pytest.raises(ContentError, match="does not match"):
+            load_pack(scratch_pack)
+
+    def test_a_wrongly_typed_field_is_rejected(self, scratch_pack: Path) -> None:
+        rewrite(scratch_pack, "weapons.json", lambda d: d["weapons"][0].update({"damage": "lots"}))
+        with pytest.raises(ContentError, match="is not of type 'integer'") as excinfo:
+            load_pack(scratch_pack)
+        assert excinfo.value.pointer == "/weapons/0/damage"
+
+    def test_a_names_file_that_is_not_lists_of_strings_is_rejected(
+        self, scratch_pack: Path
+    ) -> None:
+        path = scratch_pack / "names" / "example_folk.json"
+        path.write_text(json.dumps({"male": [1, 2]}))
+        with pytest.raises(ContentError, match="is not of type 'string'"):
+            load_pack(scratch_pack)
+
+
+class TestNewContentTypes:
+    """The files 05.1 lists that had no reader, and the EffectKinds no file could carry."""
+
+    def test_songs_load(self, pack: ContentPack) -> None:
+        # 15.8: a song's kind selects the venture it suits.
+        assert {song.kind for song in pack.songs.values()} == {
+            "lay",
+            "song_of_victory",
+            "walking_song",
+        }
+        assert pack.song("example_lay").title
+
+    def test_an_unknown_song_is_a_content_error(self, pack: ContentPack) -> None:
+        with pytest.raises(ContentError, match="no such song"):
+            pack.song("no_such_song")
+
+    def test_a_song_of_an_unknown_kind_is_rejected(self, scratch_pack: Path) -> None:
+        rewrite(scratch_pack, "songs.json", lambda d: d["songs"][0].update({"kind": "dirge"}))
+        with pytest.raises(ContentError, match="'dirge' is not one of"):
+            load_pack(scratch_pack)
+
+    def test_skill_display_names_override_but_do_not_invent(self, pack: ContentPack) -> None:
+        # 05.1: skills.json is a display-name override only; the grid is engine-fixed.
+        assert set(pack.skill_names) <= set(SKILLS)
+
+    def test_renaming_something_that_is_not_a_skill_is_rejected(self, scratch_pack: Path) -> None:
+        rewrite(scratch_pack, "skills.json", lambda d: d["skills"].update({"swords": "Blades"}))
+        with pytest.raises(ContentError, match="not one of the 18 Skills"):
+            load_pack(scratch_pack)
+
+    def test_every_effect_kind_has_a_file_a_pack_can_write_it_in(self, pack: ContentPack) -> None:
+        # 19.7: every EffectKind is represented at least once. Four of them — item
+        # blessings, curses, conditions and undertaking benefits — previously had no
+        # source file at all, so a pack could not author them however it tried.
+        assert {definition.kind for definition in pack.effects.values()} == {
+            kind.value for kind in EffectKind
+        }
+
+
+class TestReplacementEffects:
+    """05.1.1 check 5 — two effects that *replace* one hook value for one item type."""
+
+    def test_the_example_pack_pairs_replacements_by_supersession(self, pack: ContentPack) -> None:
+        # Keen and Superior Keen both replace PIERCING_THRESHOLD for a weapon; the
+        # 'supersedes' link is what makes that legal (13.7.3 decides per *item*).
+        assert pack.effect("superior_keen").supersedes == "keen"
+
+    def test_two_unlinked_replacements_are_rejected(self, scratch_pack: Path) -> None:
+        rewrite(
+            scratch_pack,
+            "rewards.json",
+            lambda d: d["rewards"].append(
+                {
+                    "id": "rival_keen",
+                    "name": "Rival Keen",
+                    "applies_to": ["weapon"],
+                    "factory": "modify_piercing_threshold",
+                    "params": {"threshold": 8},
+                }
+            ),
+        )
+        with pytest.raises(ContentError, match="both replace PIERCING_THRESHOLD"):
+            load_pack(scratch_pack)
+
+    def test_a_supersession_cycle_is_rejected(self, scratch_pack: Path) -> None:
+        # keen already declares no supersedes; pointing it back at superior_keen closes
+        # the loop, which would otherwise walk forever.
+        rewrite(
+            scratch_pack,
+            "rewards.json",
+            lambda d: next(r for r in d["rewards"] if r["id"] == "keen").update(
+                {"supersedes": "superior_keen"}
+            ),
+        )
+        with pytest.raises(ContentError, match="'supersedes' cycle"):
+            load_pack(scratch_pack)
+
+    def test_superseding_an_unknown_effect_is_rejected(self, scratch_pack: Path) -> None:
+        rewrite(
+            scratch_pack,
+            "enchanted_rewards.json",
+            lambda d: d["enchanted_rewards"][2].update({"supersedes": "no_such_reward"}),
+        )
+        with pytest.raises(ContentError, match="supersedes unknown effect"):
+            load_pack(scratch_pack)
+
+
+class TestRollSentinel:
+    """05.6 — "$roll" means the numeric die result itself."""
+
+    def test_the_sentinel_is_a_marker_not_a_bare_string(self, pack: ContentPack) -> None:
+        row = pack.table("endurance_loss").lookup(5)
+        assert row["loss"] is Sentinel.ROLL
+
+    def test_the_marker_still_round_trips_as_its_json_text(self) -> None:
+        # It is a StrEnum, so a save file keeps reading "$roll".
+        assert json.dumps(Sentinel.ROLL) == '"$roll"'
+
+    def test_a_row_without_the_sentinel_is_untouched(self, pack: ContentPack) -> None:
+        assert pack.table("endurance_loss").lookup(FeatFace.RUNE)["kind"] == "unscathed"
 
 
 class TestMerging:
@@ -547,8 +737,9 @@ class TestPerSectionGuards:
         self, scratch_pack: Path, filename: str, section: str
     ) -> None:
         rewrite(scratch_pack, filename, lambda d: d[section][0].pop("id"))
-        with pytest.raises(ContentError, match="needs an 'id'"):
+        with pytest.raises(ContentError, match="'id' is a required property") as excinfo:
             load_pack(scratch_pack)
+        assert excinfo.value.pointer == f"/{section}/0"
 
     def test_a_file_holding_an_array_is_rejected(self, scratch_pack: Path) -> None:
         (scratch_pack / "weapons.json").write_text("[]")
@@ -557,14 +748,14 @@ class TestPerSectionGuards:
 
     def test_a_section_that_is_not_an_array_is_rejected(self, scratch_pack: Path) -> None:
         (scratch_pack / "weapons.json").write_text(json.dumps({"weapons": {"id": "x"}}))
-        with pytest.raises(ContentError, match="must be an array"):
+        with pytest.raises(ContentError, match="is not of type 'array'"):
             load_pack(scratch_pack)
 
     def test_an_unknown_armour_category_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(
             scratch_pack, "armour.json", lambda d: d["armour"][0].update({"category": "chitin"})
         )
-        with pytest.raises(ContentError, match="unknown armour category"):
+        with pytest.raises(ContentError, match="'chitin' is not one of"):
             load_pack(scratch_pack)
 
     def test_an_unknown_standard_of_living_is_rejected(self, scratch_pack: Path) -> None:
@@ -573,7 +764,7 @@ class TestPerSectionGuards:
             "cultures.json",
             lambda d: d["cultures"][0].update({"standard_of_living": "regal"}),
         )
-        with pytest.raises(ContentError, match="unknown standard of living"):
+        with pytest.raises(ContentError, match="'regal' is not one of"):
             load_pack(scratch_pack)
 
     def test_an_unknown_drive_kind_is_rejected(self, scratch_pack: Path) -> None:
@@ -582,14 +773,14 @@ class TestPerSectionGuards:
             "adversaries.json",
             lambda d: d["adversaries"][0]["drive"].update({"kind": "spite"}),
         )
-        with pytest.raises(ContentError, match="unknown drive kind"):
+        with pytest.raises(ContentError, match="'spite' is not one of"):
             load_pack(scratch_pack)
 
     def test_an_adversary_without_might_is_rejected(self, scratch_pack: Path) -> None:
         rewrite(
             scratch_pack, "adversaries.json", lambda d: d["adversaries"][0].update({"might": 0})
         )
-        with pytest.raises(ContentError, match="Might of at least 1"):
+        with pytest.raises(ContentError, match="less than the minimum of 1"):
             load_pack(scratch_pack)
 
     def test_a_culture_offering_too_few_favoured_choices_is_rejected(
@@ -639,6 +830,12 @@ class TestHookCoverage:
     """
 
     #: Hooks whose consuming subsystem does not exist yet (build steps 7-17).
+    #: A hook nothing uses is either dead or unimplemented, and this list forces the
+    #: question. Entries come off as soon as an example-pack effect declares the hook —
+    #: which can precede the subsystem that dispatches it, as it does for
+    #: MODIFY_COUNCIL_ROLL (the Ill-omen curse) and MODIFY_FELLOWSHIP_RATING (the
+    #: Strengthen the Fellowship undertaking benefit). Those two exist so the example pack
+    #: covers every EffectKind (19.7); council and fellowship land at steps 13 and 15.
     AWAITING_SUBSYSTEM = frozenset(
         {
             # combat (08) — build step 11
@@ -671,14 +868,12 @@ class TestHookCoverage:
             Hook.MODIFY_HOPE_RECOVERY,
             # council (09) — build step 13
             Hook.MODIFY_AUDIENCE_ATTITUDE,
-            Hook.MODIFY_COUNCIL_ROLL,
             # progression, fellowship and phase (15, 17) — build steps 15 and 16
             Hook.FREE_UNDERTAKINGS,
             Hook.ON_VALOUR_GAIN,
             Hook.ON_WISDOM_GAIN,
             Hook.ON_PHASE_START,
             Hook.ON_PHASE_END,
-            Hook.MODIFY_FELLOWSHIP_RATING,
             Hook.MODIFY_MOUNT_VIGOUR,
             Hook.MODIFY_USEFUL_ITEM_LIMIT,
             # observers the session and Eye layers wire up — build steps 15 and 16
