@@ -129,7 +129,7 @@ type = "layers"
 # layering contract, parenthesised modules have not landed yet.
 layers = [
     "(tor.rules.combat) | (tor.rules.journey) | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.shadow) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | (tor.rules.creation)",
-    "(tor.rules.injury) | (tor.rules.contest)",
+    "tor.rules.injury | tor.rules.contest",
     "tor.rules.resources",
     "tor.rules.context",
 ]

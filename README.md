@@ -49,16 +49,17 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–7 of the order in `00-README.md` §5 are complete: `tor.dice`, `tor.tables`,
-`tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, and the first shared
-rules leaf `tor.rules.resources`, plus `content/example/`. That is the pure core, all three
-seams, and the module every other subsystem writes its state changes through. Character
-creation (step 8), the remaining rules subsystems, the session layer, and the API and CLI
-are not yet implemented.
+Build steps 1–7, 9 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+`tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, and the
+three shared rules leaves `tor.rules.resources`, `tor.rules.contest` and
+`tor.rules.injury`, plus `content/example/`. That is the pure core, all three seams, and the
+tier every later subsystem rests on. Character creation (step 8), Shadow (10), and
+everything from combat onward are not yet implemented, nor are the session layer, the API
+and the CLI.
 
-Steps 8 and 9 will be taken **out of order**: `tor.rules.contest` and `tor.rules.injury`
-land before `tor.rules.creation`. Neither depends on the other, and the two small shared
-leaves complete the tier that every subsystem from combat onward rests on.
+Steps 8 and 9 are taken **out of order**: `tor.rules.contest` and `tor.rules.injury` landed
+before `tor.rules.creation`. Neither depends on the other, and the two small shared leaves
+complete the tier, so creation gets an undiluted change of its own.
 
 Content packs are validated in two passes. The JSON Schemas in `tor/content/schema/` check
 shape — required fields, types, enumerated values, arity, and any field the format does not
@@ -82,6 +83,10 @@ Three deliberate deviations from the spec are recorded, each in the module that 
 - `tor/rules/resources.py` — `7.4` and `7.5` write `recompute_load(hero)` and
   `recompute_conditions(hero)`, but Load needs the effect bus and the gear types, and
   `17.5` and `04.7` both forbid caching it on the `Hero`. Both take a keyword-only `ctx`.
+- `tor/rules/contest.py` — `09.1`'s `evaluate` code block returns `DISASTER` for a
+  scoreless contest, while the prose two lines below says the two adapters differ on
+  exactly that. The shared engine returns `TOTAL_FAILURE`; the council adapter promotes it,
+  because for a council "every attempt failed" *is* a Disaster.
 
 ## Development
 

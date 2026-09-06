@@ -9,7 +9,7 @@ from __future__ import annotations
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from tor.dice import FEAT_FACES, ScriptedRandomness, SuccessDie
+from tor.dice import FEAT_FACES, FeatValue, ScriptedRandomness, SuccessDie
 from tor.effects.bus import EffectBus, EffectKind, EffectSource
 from tor.effects.hooks import Hook, HookContext
 from tor.effects.library import build_effect
@@ -21,6 +21,7 @@ from tor.model.gear import ArmourCategory, ArmourInstance, ArmourType, Gear
 from tor.model.hero import Hero
 from tor.model.ids import CallingId, CultureId, EffectId, HeroId, ItemId
 from tor.rolls import Degree, Outcome, RollRequest, resolve
+from tor.rules.contest import ContestOutcome, ResistanceContest, evaluate
 from tor.rules.context import RulesContext
 from tor.rules.resources import (
     ChangeSource,
@@ -354,3 +355,38 @@ class TestResourceInvariants:
         recompute_load(hero, ctx=ctx)
         bus.unregister_source(source)
         assert recompute_load(hero, ctx=ctx) == before
+
+
+class TestContestTermination:
+    """19.5 — a ResistanceContest terminates."""
+
+    @given(
+        resistance=st.integers(min_value=1, max_value=9),
+        allowed=st.integers(min_value=1, max_value=12),
+        faces=st.lists(st.sampled_from(list(FEAT_FACES)), min_size=12, max_size=12),
+    )
+    def test_it_finishes_within_its_attempt_budget(
+        self, resistance: int, allowed: int, faces: list[FeatValue]
+    ) -> None:
+        # 19.5 states the bound as `attempts_allowed + 1`, but `record` raises StateError
+        # once the contest is finished (01.6), so the reachable bound is attempts_allowed.
+        contest = ResistanceContest(resistance=resistance, attempts_allowed=allowed)
+        for face in faces:
+            if contest.finished:
+                break
+            rng = ScriptedRandomness(feats=[face], successes=[4])
+            contest.record(resolve(RollRequest(rating=1, target_number=14), rng))
+
+        assert contest.finished
+        assert contest.attempts_used <= allowed
+
+    @given(
+        resistance=st.integers(min_value=1, max_value=9),
+        allowed=st.one_of(st.none(), st.integers(min_value=1, max_value=6)),
+    )
+    def test_evaluate_always_returns_a_defined_outcome(
+        self, resistance: int, allowed: int | None
+    ) -> None:
+        contest = ResistanceContest(resistance=resistance, attempts_allowed=allowed)
+        contest.abort("disaster")
+        assert evaluate(contest) in set(ContestOutcome)
