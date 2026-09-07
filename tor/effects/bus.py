@@ -15,7 +15,13 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from tor.effects.hooks import Contribution, Hook, HookContext, NumericContribution
+from tor.effects.hooks import (
+    Contribution,
+    Hook,
+    HookContext,
+    NumericContribution,
+    ReplacementContribution,
+)
 from tor.errors import RuleViolation
 from tor.model.derive import DerivedStat, Modifier
 from tor.model.ids import EffectId
@@ -219,13 +225,26 @@ class EffectBus:
         return gathered
 
     def apply_numeric(self, hook: Hook, ctx: HookContext, base: int) -> DerivedStat:
-        """Collect a hook's additive contributions into a :class:`DerivedStat`."""
-        modifiers = tuple(
-            Modifier(source=c.source, delta=c.delta)
-            for c in self.collect(hook, ctx)
-            if isinstance(c, NumericContribution)
-        )
-        return DerivedStat(base=base, modifiers=modifiers)
+        """Collect a hook's value-shaped contributions into a :class:`DerivedStat`.
+
+        Additive contributions become deltas. An ``int``-valued replacement becomes a
+        :class:`Modifier` with ``replacement`` set, which ``DerivedStat.value`` resolves
+        ahead of the base — that is how Mithril Make, which ``04.3.2`` names explicitly for
+        ``MODIFY_ITEM_LOAD``, replaces an item's Load outright rather than adjusting it.
+        A replacement carrying anything but an ``int`` is not a value for this stat and is
+        left to whichever caller collects that hook directly.
+        """
+        modifiers: list[Modifier] = []
+        for contribution in self.collect(hook, ctx):
+            if isinstance(contribution, NumericContribution):
+                modifiers.append(Modifier(source=contribution.source, delta=contribution.delta))
+            elif isinstance(contribution, ReplacementContribution) and isinstance(
+                contribution.value, int
+            ):
+                modifiers.append(
+                    Modifier(source=contribution.source, replacement=contribution.value)
+                )
+        return DerivedStat(base=base, modifiers=tuple(modifiers))
 
     # -- usage budgets ---------------------------------------------------------------
 

@@ -35,9 +35,10 @@ jobs:
       - name: Tests
         run: pytest --cov=tor --cov-branch --cov-report=term-missing
 
-      # 19: tor.rolls and tor.effects are where the rules live, so they are held to full
-      # branch coverage. The tor.rules.* half of the gate applies as those modules land.
+      # 19: tor.rolls, tor.effects and tor.rules are where the rules live, so all three
+      # are held to full branch coverage.
       - name: Coverage gate on the core
         run: |
           coverage report --include='tor/rolls.py' --fail-under=100
           coverage report --include='tor/effects/*' --fail-under=100
+          coverage report --include='tor/rules/*' --fail-under=100

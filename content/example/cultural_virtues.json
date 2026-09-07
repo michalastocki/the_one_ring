@@ -1,18 +1,92 @@
-{"cultural_virtues": [
-  {"id": "example_cv_hope", "name": "Example Cultural Virtue", "culture": "example_folk",
-   "min_wisdom": 2, "factory": "numeric_modifier",
-   "params": {"hook": "MODIFY_MAX_HOPE", "delta": 1}},
-
-  {"id": "example_cv_guard", "name": "Example Guardian", "culture": "example_folk",
-   "min_wisdom": 2, "factory": "secondary_action_task",
-   "params": {"task": "protect_companion", "stance": "defensive",
-              "usage": {"scope": "combat", "limit": 1}}},
-
-  {"id": "second_cv_sorcery", "name": "Untameable Spirit", "culture": "second_folk",
-   "min_wisdom": 2, "factory": "bonus_dice",
-   "params": {"purpose": "shadow_test", "source": "sorcery", "dice": 1}},
-
-  {"id": "second_cv_wisdom", "name": "Second Sight", "culture": "second_folk",
-   "min_wisdom": 2, "factory": "grant_inspiration",
-   "params": {"usage": {"scope": "adventuring_phase", "limit": "wisdom"}}}
-]}
+{
+ "cultural_virtues": [
+  {
+   "id": "example_cv_hope",
+   "name": "Example Cultural Virtue",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "numeric_modifier",
+   "params": {
+    "hook": "MODIFY_MAX_HOPE",
+    "delta": 1
+   }
+  },
+  {
+   "id": "example_cv_guard",
+   "name": "Example Guardian",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "secondary_action_task",
+   "params": {
+    "task": "protect_companion",
+    "stance": "defensive",
+    "usage": {
+     "scope": "combat",
+     "limit": 1
+    }
+   }
+  },
+  {
+   "id": "second_cv_sorcery",
+   "name": "Untameable Spirit",
+   "culture": "second_folk",
+   "min_wisdom": 2,
+   "factory": "bonus_dice",
+   "params": {
+    "purpose": "shadow_test",
+    "source": "sorcery",
+    "dice": 1
+   }
+  },
+  {
+   "id": "second_cv_wisdom",
+   "name": "Second Sight",
+   "culture": "second_folk",
+   "min_wisdom": 2,
+   "factory": "grant_inspiration",
+   "params": {
+    "usage": {
+     "scope": "adventuring_phase",
+     "limit": "wisdom"
+    }
+   }
+  },
+  {
+   "id": "example_cv_cram",
+   "name": "Cram",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "rest_recovery",
+   "params": {
+    "hook": "MODIFY_SHORT_REST_RECOVERY",
+    "stat": "wisdom",
+    "target": "company"
+   }
+  },
+  {
+   "id": "example_cv_deep_roots",
+   "name": "Deep Roots",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "rest_recovery",
+   "params": {
+    "hook": "MODIFY_PROLONGED_REST_RECOVERY",
+    "stat": "strength",
+    "predicate": {
+     "wounded": true
+    }
+   }
+  },
+  {
+   "id": "example_cv_dreams",
+   "name": "Waking Dreams",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "set_flag",
+   "params": {
+    "hook": "SHORT_REST_COUNTS_AS_PROLONGED",
+    "flag": "counts_as_prolonged"
+   }
+  }
+ ]
+}

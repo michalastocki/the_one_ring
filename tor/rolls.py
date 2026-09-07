@@ -416,15 +416,23 @@ FOCUSED_SUPPORT_DICE = 2
 class RollingCharacter(Protocol):
     """The narrow view :func:`build_request` needs (``01.5``).
 
-    Implemented by both ``Hero`` and ``AdversaryInstance``. This structural typing is why
-    one code path serves both despite their very different sheets, and why the Feat-die
-    icon inversion is a flag rather than a parallel implementation.
+    Implemented by ``Hero``. This structural typing is why one code path serves heroes and
+    adversaries alike despite their very different sheets, and why the Feat-die icon
+    inversion is a flag rather than a parallel implementation — an adversary that has no
+    Skills passes ``rating=`` explicitly instead.
+
+    ``01.5`` sketches four members: ``ability_rating``, ``target_number``, ``conditions``
+    and ``effects``. This is the one :func:`build_request` actually consults; the other
+    three arrive as explicit parameters (``target_number``, ``weary``,
+    ``eye_is_auto_failure``, ``bus``), which is the stronger form of the same doctrine —
+    a subsystem is handed narrow, explicit dependencies rather than reaching through the
+    actor for them. ``effects`` in particular is unsatisfiable rather than merely unused:
+    an ``EffectBus`` field on ``Hero`` would make ``tor.model`` import ``tor.effects``,
+    which imports ``tor.model.derive`` — a runtime import cycle, not just a breach of
+    ``01.1``. The bus reaches a rule through ``tor.rules.context.RulesContext`` instead.
     """
 
     def rating(self, ability: AbilityId) -> int: ...
-
-    @property
-    def effects(self) -> EffectBus: ...
 
 
 class SupportInput(Protocol):

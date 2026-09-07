@@ -19,6 +19,7 @@ from tor.effects.bus import (
 from tor.effects.hooks import (
     DEFAULT_ENVIRONMENT,
     ActionContribution,
+    Contribution,
     Environment,
     FlagContribution,
     Hook,
@@ -115,6 +116,52 @@ class TestRegistration:
         assert bus.apply_numeric(Hook.MODIFY_PARRY, ctx(), base=12).value == before + 1
         bus.unregister_source(source)
         assert bus.apply_numeric(Hook.MODIFY_PARRY, ctx(), base=12).value == before
+
+
+class TestApplyNumericFolding:
+    """What `apply_numeric` folds into a DerivedStat, and what it deliberately leaves."""
+
+    def _bus_with(self, contribution: Contribution) -> EffectBus:
+        bus = EffectBus()
+        bus.register(
+            Effect(
+                id=EffectId("mithril_make"),
+                kind=EffectKind.ENCHANTED_REWARD,
+                listeners={Hook.MODIFY_ITEM_LOAD: lambda _ctx: contribution},
+            ),
+            EffectSource.item("mail#1"),
+        )
+        return bus
+
+    def test_an_int_replacement_overrides_the_base(self) -> None:
+        # 04.3.2 names Mithril for MODIFY_ITEM_LOAD: it replaces an item's Load outright
+        # rather than adjusting it, so folding only NumericContribution would drop it.
+        bus = self._bus_with(ReplacementContribution(source=EffectId("mithril_make"), value=2))
+        assert bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, ctx(), base=9).value == 2
+
+    def test_a_replacement_and_a_delta_compose(self) -> None:
+        bus = self._bus_with(ReplacementContribution(source=EffectId("mithril_make"), value=4))
+        bus.register(
+            numeric("cunning_make", -2, hook=Hook.MODIFY_ITEM_LOAD), EffectSource.acquired()
+        )
+        assert bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, ctx(), base=9).value == 2
+
+    def test_a_bool_is_not_a_replacement_value(self) -> None:
+        # bool subclasses int, so this is worth pinning: True must not become Load 1.
+        bus = self._bus_with(FlagContribution(source=EffectId("mithril_make"), flag="shiny"))
+        assert bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, ctx(), base=9).value == 9
+
+    def test_a_non_int_replacement_is_left_to_a_direct_collector(self) -> None:
+        bus = self._bus_with(
+            ReplacementContribution(source=EffectId("mithril_make"), value="feather-light")
+        )
+        assert bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, ctx(), base=9).value == 9
+
+    def test_an_action_contribution_is_not_a_value(self) -> None:
+        bus = self._bus_with(
+            ActionContribution(source=EffectId("mithril_make"), action="glow", payload={})
+        )
+        assert bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, ctx(), base=9).value == 9
 
 
 class TestDeterminism:
