@@ -27,7 +27,7 @@ a ``RollRequest`` by hand, except for pure table rolls that have no character be
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -473,8 +473,18 @@ def build_request(
     environment: Environment = DEFAULT_ENVIRONMENT,
     target: Any = None,
     extra: Mapping[str, Any] | None = None,
+    extra_hooks: Sequence[Hook] = (),
 ) -> RollRequest:
-    """Assemble a request, folding in every effect that modifies the roll."""
+    """Assemble a request, folding in every effect that modifies the roll.
+
+    ``extra_hooks`` names further hooks whose contributions shape *this* roll in exactly
+    the same way ``MODIFY_ROLL_REQUEST`` does — ``04.3`` has one per subsystem
+    (``MODIFY_SHADOW_TEST``, ``MODIFY_COUNCIL_ROLL``, ``MODIFY_JOURNEY_EVENT_ROLL``,
+    ``MODIFY_WOUND_SEVERITY_ROLL``, ``MODIFY_PROTECTION_ROLL``), so that a Cultural Virtue
+    adding ``+1d`` against Sorcery can say which kind of roll it means without predicating
+    on a purpose string. They are collected with the same loop rather than a second one:
+    ``01.3``'s catalogue exists to keep that folding in one place.
+    """
     ctx = HookContext(
         hook=Hook.MODIFY_ROLL_REQUEST,
         actor=character,
@@ -498,7 +508,10 @@ def build_request(
     favoured: list[str] = []
     ill_favoured: list[str] = []
     effect_dice = 0
-    for contribution in bus.collect(Hook.MODIFY_ROLL_REQUEST, ctx):
+    gathered = list(bus.collect(Hook.MODIFY_ROLL_REQUEST, ctx))
+    for hook in extra_hooks:
+        gathered += bus.collect(hook, replace(ctx, hook=hook))
+    for contribution in gathered:
         if isinstance(contribution, NumericContribution):
             effect_dice += contribution.delta
         elif isinstance(contribution, FlagContribution):

@@ -67,6 +67,7 @@ from tor.rules.creation import (
     spend_previous_experience,
 )
 from tor.rules.resources import recompute_load
+from tor.rules.shadow import OVERBURDENED_ID
 
 EXAMPLE_PACK = Path(__file__).resolve().parents[2] / "content" / "example"
 
@@ -1003,6 +1004,8 @@ class TestBuildHero:
     def test_every_granted_effect_reaches_the_bus_in_stage_order(self, pack) -> None:
         hero, bus = built(pack)
         assert [str(e.id) for e in bus.effects()] == [
+            # 11.2's always-on condition first, before anything a choice granted.
+            "overburdened_by_shadow",
             "example_blessing",
             "bold",
             "eager",
@@ -1011,6 +1014,12 @@ class TestBuildHero:
             "cunning_make",
         ]
         assert hero.virtues == ["hardiness"]
+
+    def test_the_always_on_shadow_condition_is_attached_without_being_asked_for(self, pack) -> None:
+        # 11.2: registered permanently at hero construction, so that no code path can
+        # forget to. A new hero is at Shadow 0, so the predicate keeps it silent.
+        _, bus = built(pack)
+        assert bus.registered(OVERBURDENED_ID)
 
     def test_a_cultural_weakness_is_registered_alongside_the_blessing(self, pack) -> None:
         hero, bus = built(pack, **second_folk())

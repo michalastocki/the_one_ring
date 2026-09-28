@@ -125,11 +125,14 @@ name = "shared rules leaves"
 type = "layers"
 # 01.1 excludes the shared leaves from the independence contract above, but leaves their
 # order among themselves unstated. This fixes it: the subsystems sit above the leaves,
-# injury and contest may use resources, and resources uses only the context. As with the
-# layering contract, parenthesised modules have not landed yet.
+# injury, contest and shadow may use resources, and resources uses only the context. As
+# with the layering contract, parenthesised modules have not landed yet.
+#
+# shadow genuinely needs resources: every function in it moves Shadow, and only
+# resources.recompute_conditions may write the Miserable flag derived from it (03.8, 11.6).
 layers = [
-    "(tor.rules.combat) | (tor.rules.journey) | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.shadow) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | tor.rules.creation",
-    "tor.rules.injury | tor.rules.contest",
+    "(tor.rules.combat) | (tor.rules.journey) | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | tor.rules.creation",
+    "tor.rules.injury | tor.rules.contest | tor.rules.shadow",
     "tor.rules.resources",
     "tor.rules.context",
 ]

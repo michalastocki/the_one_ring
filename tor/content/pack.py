@@ -134,6 +134,9 @@ class ContentPack:
     def adversary(self, adversary_id: str) -> Adversary:
         return _require(self.adversaries, adversary_id, "adversary")
 
+    def shadow_path(self, path_id: str) -> ShadowPath:
+        return _require(self.shadow_paths, path_id, "shadow path")
+
     def patron(self, patron_id: str) -> Patron:
         return _require(self.patrons, patron_id, "patron")
 

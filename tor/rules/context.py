@@ -106,6 +106,10 @@ class RulesContext:
     buses: Mapping[CombatantId, EffectBus]
     scene: SceneKind | None = None
     environment: Environment = DEFAULT_ENVIRONMENT
+    #: ``02.3.8``'s official option: Target Numbers derive from 18 rather than 20. A
+    #: campaign-level setting, so it belongs to the campaign-level context — "applied when
+    #: the ``AttributeSet`` computes TNs, never ad hoc at a call site".
+    short_campaign: bool = False
 
     @classmethod
     def single(
@@ -116,9 +120,16 @@ class RulesContext:
         gear: GearIndex,
         scene: SceneKind | None = None,
         environment: Environment = DEFAULT_ENVIRONMENT,
+        short_campaign: bool = False,
     ) -> RulesContext:
         """A context for one actor — the common shape outside combat."""
-        return cls(gear=gear, buses={actor_id: bus}, scene=scene, environment=environment)
+        return cls(
+            gear=gear,
+            buses={actor_id: bus},
+            scene=scene,
+            environment=environment,
+            short_campaign=short_campaign,
+        )
 
     def bus(self, actor_id: CombatantId) -> EffectBus:
         """The actor's effect bus.

@@ -226,6 +226,7 @@ def favour_rolls(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any
     """
     purpose = params.get("purpose")
     abilities = frozenset(params.get("abilities", ()))
+    hook = _hook(params, effect_id, Hook.MODIFY_ROLL_REQUEST)
 
     def listen(ctx: HookContext) -> Contribution | None:
         if purpose is not None and ctx.purpose != purpose:
@@ -234,7 +235,7 @@ def favour_rolls(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any
             return None
         return FlagContribution(source=effect_id, flag="favoured", value=str(effect_id))
 
-    return _effect(effect_id, kind, {Hook.MODIFY_ROLL_REQUEST: listen}, params)
+    return _effect(effect_id, kind, {hook: listen}, params)
 
 
 @register_factory("ill_favour_when_applicable")
@@ -259,10 +260,16 @@ def ill_favour_when_applicable(
 
 @register_factory("bonus_dice")
 def bonus_dice(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -> Effect:
-    """``{"purpose": "shadow_test", "source": "sorcery", "dice": 1}`` — +Nd on matching rolls."""
+    """``{"hook": "MODIFY_SHADOW_TEST", "source": "sorcery", "dice": 1}`` — +Nd on a roll.
+
+    ``hook`` defaults to ``MODIFY_ROLL_REQUEST``; naming one of ``04.3``'s per-subsystem
+    roll hooks instead is how a Cultural Virtue says *which kind* of roll it means without
+    matching on a purpose string. ``purpose`` and ``source`` narrow it further.
+    """
     purpose = params.get("purpose")
     against = params.get("source")
     dice = int(params.get("dice", 1))
+    hook = _hook(params, effect_id, Hook.MODIFY_ROLL_REQUEST)
 
     def listen(ctx: HookContext) -> Contribution | None:
         if purpose is not None and ctx.purpose != purpose:
@@ -271,7 +278,7 @@ def bonus_dice(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any])
             return None
         return NumericContribution(source=effect_id, delta=dice)
 
-    return _effect(effect_id, kind, {Hook.MODIFY_ROLL_REQUEST: listen}, params)
+    return _effect(effect_id, kind, {hook: listen}, params)
 
 
 @register_factory("grant_inspiration")
@@ -447,6 +454,28 @@ def set_flag(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -
 
     def listen(_ctx: HookContext) -> Contribution:
         return FlagContribution(source=effect_id, flag=flag, value=value)
+
+    return _effect(effect_id, kind, {hook: listen}, params)
+
+
+@register_factory("replace_value", replaces=True)
+def replace_value(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -> Effect:
+    """``{"hook": "MODIFY_ITEM_LOAD", "value": 1}`` — override a value outright (``04.2.2``).
+
+    The counterpart to :func:`numeric_modifier` for the handful of qualities that *replace*
+    rather than adjust: ``04.3.2`` names Mithril Make for ``MODIFY_ITEM_LOAD`` in exactly
+    those words, and a cap that must hold whatever figure it is handed is the same shape.
+    Used sparingly — two replacements colliding on one hook and item type is a
+    ``ContentError`` when the pack is validated (``05.1.1`` check 5), which is why this is
+    registered with ``replaces=True``.
+    """
+    hook = _hook(params, effect_id)
+    if "value" not in params:
+        raise ContentError("replace_value needs a 'value'", entity_id=str(effect_id))
+    value = params["value"]
+
+    def listen(_ctx: HookContext) -> Contribution:
+        return ReplacementContribution(source=effect_id, value=value)
 
     return _effect(effect_id, kind, {hook: listen}, params)
 

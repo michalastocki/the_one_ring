@@ -716,6 +716,14 @@ class TestLookups:
         with pytest.raises(ContentError, match="no such undertaking"):
             pack.undertaking("no_such_undertaking")
 
+    def test_a_shadow_path_reads_its_four_ordered_flaws(self, pack: ContentPack) -> None:
+        # 11.7: four steps, one Flaw each, in order — that ordering is the whole content.
+        path = pack.shadow_path("example_path")
+        assert len(path.steps) == 4
+        assert all(step in pack.effects for step in path.steps)
+        with pytest.raises(ContentError, match="no such shadow path"):
+            pack.shadow_path("no_such_path")
+
     def test_the_standard_of_living_ladder_reads_as_a_tier_and_as_a_pair(
         self, pack: ContentPack
     ) -> None:
@@ -901,10 +909,6 @@ class TestHookCoverage:
             Hook.MODIFY_JOURNEY_EVENT_ROLL,
             Hook.JOURNEY_ROLE_LIMITS,
             Hook.ON_JOURNEY_END,
-            # shadow (11) — build step 10
-            Hook.MODIFY_SHADOW_GAIN,
-            Hook.MODIFY_SHADOW_TEST,
-            Hook.MODIFY_SHADOW_FLOOR,
             # council (09) — build step 13
             Hook.MODIFY_AUDIENCE_ATTITUDE,
             # progression, fellowship and phase (15, 17) — build steps 15 and 16

@@ -28,7 +28,7 @@ from tor.effects.hooks import (
     ReplacementContribution,
     SceneKind,
 )
-from tor.effects.library import build_effect, build_predicate
+from tor.effects.library import REPLACEMENT_FACTORIES, build_effect, build_predicate
 from tor.errors import ContentError, RuleViolation
 from tor.model.conditions import ConditionSet
 from tor.model.ids import AbilityId, EffectId
@@ -549,6 +549,33 @@ class TestFactories:
                 {"usage": {"scope": "fortnight"}},
             )
 
+    def test_replace_value_overrides_rather_than_adjusts(self) -> None:
+        # 04.3.2 names Mithril Make for MODIFY_ITEM_LOAD in exactly those words, and until
+        # this factory existed the pack could only express it as a delta.
+        effect = build_effect(
+            EffectId("mithril_make"),
+            EffectKind.ENCHANTED_REWARD,
+            "replace_value",
+            {"hook": "MODIFY_ITEM_LOAD", "value": 1},
+        )
+        bus = EffectBus()
+        bus.register(effect, EffectSource.item("mail#1"))
+        assert bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, ctx(), base=9).value == 1
+
+    def test_replace_value_is_declared_as_a_replacing_factory(self) -> None:
+        # 05.1.1 check 5 refuses two of these on one hook and item type, and it finds them
+        # through this set.
+        assert "replace_value" in REPLACEMENT_FACTORIES
+
+    def test_replace_value_needs_a_value(self) -> None:
+        with pytest.raises(ContentError, match="needs a 'value'"):
+            build_effect(
+                EffectId("x"),
+                EffectKind.ENCHANTED_REWARD,
+                "replace_value",
+                {"hook": "MODIFY_ITEM_LOAD"},
+            )
+
 
 class TestBuildRequest:
     def test_folds_effect_dice_into_the_request(self) -> None:
@@ -589,6 +616,64 @@ class TestBuildRequest:
         )
         assert request.favoured_sources == ("stout_hearted",)
         assert request.policy is FeatDicePolicy.FAVOURED
+
+    def test_extra_hooks_fold_into_the_same_request(self) -> None:
+        # 04.3 gives each subsystem its own "modify this roll" hook so that a Cultural
+        # Virtue can say which kind of roll it means without matching a purpose string.
+        # They are folded by the same loop, not a second one (01.3).
+        actor = FakeCharacter(ratings={"wisdom": 3})
+        actor.effects.register(
+            build_effect(
+                EffectId("untameable_spirit"),
+                EffectKind.CULTURAL_VIRTUE,
+                "bonus_dice",
+                {"hook": "MODIFY_SHADOW_TEST", "dice": 1},
+            ),
+            EffectSource.acquired(),
+        )
+        actor.effects.register(
+            build_effect(
+                EffectId("patrons_counsel"),
+                EffectKind.PATRON_BENEFIT,
+                "favour_rolls",
+                {"hook": "MODIFY_SHADOW_TEST"},
+            ),
+            EffectSource.acquired(),
+        )
+
+        without = build_request(actor, AbilityId("wisdom"), bus=actor.effects, target_number=15)
+        assert (without.bonus_dice, without.favoured_sources) == (0, ())
+
+        with_hook = build_request(
+            actor,
+            AbilityId("wisdom"),
+            bus=actor.effects,
+            target_number=15,
+            extra_hooks=(Hook.MODIFY_SHADOW_TEST,),
+        )
+        assert with_hook.bonus_dice == 1
+        assert with_hook.favoured_sources == ("patrons_counsel",)
+
+    def test_an_extra_hook_reaches_its_listeners_under_its_own_hook(self) -> None:
+        # The listener sees the hook it registered for, not MODIFY_ROLL_REQUEST, so a
+        # predicate or a listener that inspects ctx.hook is not lied to.
+        seen: list[Hook] = []
+
+        def listen(hook_ctx: HookContext) -> Contribution:
+            seen.append(hook_ctx.hook)
+            return NumericContribution(source=EffectId("watcher"), delta=1)
+
+        actor = FakeCharacter()
+        actor.effects.register(
+            Effect(
+                id=EffectId("watcher"),
+                kind=EffectKind.VIRTUE,
+                listeners={Hook.MODIFY_SHADOW_TEST: listen},
+            ),
+            EffectSource.acquired(),
+        )
+        build_request(actor, None, bus=actor.effects, extra_hooks=(Hook.MODIFY_SHADOW_TEST,))
+        assert seen == [Hook.MODIFY_SHADOW_TEST]
 
     def test_hope_grants_one_die_and_two_while_inspired(self) -> None:
         plain = FakeCharacter()

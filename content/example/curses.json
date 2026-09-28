@@ -5,5 +5,13 @@
 
   {"id": "example_ill_omen", "name": "Ill-omen",
    "factory": "numeric_modifier",
-   "params": {"hook": "MODIFY_COUNCIL_ROLL", "delta": -1}}
+   "params": {"hook": "MODIFY_COUNCIL_ROLL", "delta": -1}},
+
+  {"id": "example_shadow_taint", "name": "Shadow Taint",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_SHADOW_FLOOR", "delta": 2}},
+
+  {"id": "example_dread_whispers", "name": "Dread Whispers",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_SHADOW_GAIN", "delta": 1, "predicate": {"flag": "source_dread"}}}
 ]}

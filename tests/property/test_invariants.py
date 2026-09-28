@@ -23,7 +23,7 @@ from tor.model.derive import DerivedStat, Modifier
 from tor.model.gear import ArmourCategory, ArmourInstance, ArmourType, Gear
 from tor.model.hero import Hero
 from tor.model.ids import AbilityId, CallingId, CultureId, EffectId, HeroId, ItemId
-from tor.rolls import Degree, Outcome, RollRequest, resolve
+from tor.rolls import Degree, Outcome, RollRequest, build_request, resolve
 from tor.rules.contest import ContestOutcome, ResistanceContest, evaluate
 from tor.rules.context import RulesContext
 from tor.rules.creation import (
@@ -58,6 +58,15 @@ from tor.rules.resources import (
     change_treasure,
     recompute_conditions,
     recompute_load,
+)
+from tor.rules.shadow import (
+    RemovalReason,
+    ShadowSource,
+    gain_shadow,
+    harden_will,
+    heal_scar,
+    register_shadow_conditions,
+    remove_shadow,
 )
 
 LADDER: list[tuple[StandardOfLiving, int | None]] = [
@@ -583,3 +592,87 @@ class TestCreatedHeroes:
         hook_ctx = HookContext(hook=Hook.MODIFY_MAX_ENDURANCE, actor=hero)
         without = bus.apply_numeric(Hook.MODIFY_MAX_ENDURANCE, hook_ctx, hero.max_endurance.base)
         assert without.value == hero.max_endurance.base == with_virtue - 2
+
+
+class TestShadowInvariants:
+    """19.5 — `0 <= shadow <= max_hope` always, whatever sequence of legal moves ran."""
+
+    @given(
+        max_hope=st.integers(min_value=1, max_value=20),
+        scars=st.integers(min_value=0, max_value=4),
+        moves=st.lists(
+            st.tuples(
+                st.sampled_from(["gain", "remove", "harden", "heal"]),
+                st.integers(min_value=0, max_value=8),
+            ),
+            max_size=12,
+        ),
+    )
+    @settings(max_examples=60, deadline=None)
+    def test_shadow_stays_inside_its_range_and_above_its_scars(
+        self, max_hope: int, scars: int, moves: list[tuple[str, int]]
+    ) -> None:
+        assume(scars <= max_hope)
+        hero = hero_with(endurance=10, hope=max_hope, shadow=scars, fatigue=0)
+        hero.max_hope = DerivedStat(base=max_hope)
+        hero.shadow_scars = scars
+        bus = EffectBus()
+        register_shadow_conditions(bus)
+        ctx = RulesContext.single(hero.id, bus=bus, gear=OneArmour(load=0))
+
+        for move, amount in moves:
+            if move == "gain":
+                gain_shadow(hero, amount, ShadowSource.MISDEED, ctx=ctx)
+            elif move == "remove":
+                remove_shadow(hero, amount, RemovalReason.FELLOWSHIP_PHASE, ctx=ctx)
+            elif move == "harden":
+                if hero.shadow < hero.max_hope.value:
+                    harden_will(hero, ctx=ctx)
+            elif hero.shadow_scars:
+                heal_scar(hero, ctx=ctx)
+
+            # Invariant I5 and I6, after every single move rather than only at the end.
+            assert 0 <= hero.shadow <= hero.max_hope.value
+            assert hero.shadow_scars <= hero.shadow
+            hero.validate()
+
+    @given(
+        max_hope=st.integers(min_value=2, max_value=20),
+        shadow=st.integers(min_value=0, max_value=20),
+        gain=st.integers(min_value=0, max_value=30),
+    )
+    @settings(max_examples=60, deadline=None)
+    def test_what_the_ceiling_discards_is_never_banked(
+        self, max_hope: int, shadow: int, gain: int
+    ) -> None:
+        # I5's whole point: points beyond maximum Hope are discarded, not held over.
+        assume(shadow <= max_hope)
+        hero = hero_with(endurance=10, hope=max_hope, shadow=shadow, fatigue=0)
+        hero.max_hope = DerivedStat(base=max_hope)
+        bus = EffectBus()
+        ctx = RulesContext.single(hero.id, bus=bus, gear=OneArmour(load=0))
+
+        before = hero.shadow
+        outcome = gain_shadow(hero, gain, ShadowSource.MISDEED, ctx=ctx)
+        assert outcome.gained + outcome.discarded == gain
+        assert hero.shadow == before + outcome.gained
+        assert hero.shadow <= max_hope
+        assert outcome.at_maximum == (hero.shadow == max_hope)
+
+    @given(
+        max_hope=st.integers(min_value=1, max_value=20),
+        shadow=st.integers(min_value=0, max_value=20),
+    )
+    @settings(max_examples=40, deadline=None)
+    def test_ill_favoured_on_everything_tracks_the_maximum_exactly(
+        self, max_hope: int, shadow: int
+    ) -> None:
+        # 11.2's always-on effect, asserted as the biconditional the predicate claims.
+        assume(shadow <= max_hope)
+        hero = hero_with(endurance=10, hope=max_hope, shadow=shadow, fatigue=0)
+        hero.max_hope = DerivedStat(base=max_hope)
+        bus = EffectBus()
+        register_shadow_conditions(bus)
+
+        request = build_request(hero, AbilityId("hunting"), bus=bus, target_number=14)
+        assert bool(request.ill_favoured_sources) == (shadow == max_hope)

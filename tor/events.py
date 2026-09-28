@@ -65,6 +65,15 @@ class EventKind(StrEnum):
     RESTED = "rested"
     FELLOWSHIP_SPENT = "fellowship_spent"
 
+    # -- the Shadow (``11``) ------------------------------------------------------------
+    SHADOW_GAINED = "shadow_gained"
+    SHADOW_REMOVED = "shadow_removed"
+    SHADOW_SCAR_GAINED = "shadow_scar_gained"
+    SHADOW_SCAR_HEALED = "shadow_scar_healed"
+    WILL_HARDENED = "will_hardened"
+    BOUT_OF_MADNESS = "bout_of_madness"
+    FLAW_GAINED = "flaw_gained"
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Event:

@@ -49,17 +49,17 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–9 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
-`tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, the
-three shared rules leaves `tor.rules.resources`, `tor.rules.contest` and
-`tor.rules.injury`, and `tor.rules.creation`, plus `content/example/`. That is the pure
-core, all three seams, the tier every later subsystem rests on, and the pipeline that turns
-a content pack into a playable hero and Company. Shadow (10) and everything from combat
-onward are not yet implemented, nor are the session layer, the API and the CLI.
+Build steps 1–10 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+`tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, all four
+shared rules leaves — `tor.rules.resources`, `tor.rules.contest`, `tor.rules.injury` and
+`tor.rules.shadow` — and `tor.rules.creation`, plus `content/example/`. That is the pure
+core, all three seams, the whole leaf tier every later subsystem rests on, and the pipeline
+that turns a content pack into a playable hero and Company. Everything from combat (11)
+onward is not yet implemented, nor are the session layer, the API and the CLI.
 
 Steps 8 and 9 were taken **out of order**: `tor.rules.contest` and `tor.rules.injury`
-landed before `tor.rules.creation`, so the shared-leaf tier was complete before the first
-subsystem was built on it.
+landed before `tor.rules.creation`, so most of the shared-leaf tier was complete before the
+first subsystem was built on it.
 
 Content packs are validated in two passes. The JSON Schemas in `tor/content/schema/` check
 shape — required fields, types, enumerated values, arity, and any field the format does not
@@ -91,6 +91,10 @@ Deliberate deviations from the spec are recorded, each in the module that makes 
   but `06.6` spends a Previous Experience budget down the same ladder during creation, and
   `01.1` forbids one subsystem from importing another. The ladder sits at L2 instead, which
   both may read downward.
+- `tor/rules/shadow.py` — `11.5`'s code block sets Shadow to 1 when a hero hardens their
+  will, while its own note three lines below says "Shadow becomes exactly the scar count,
+  which is at least 1". Both cannot hold for a hero who has hardened before: the block would
+  leave them with three Scars and Shadow 1, breaching invariant I6. The note wins.
 - `tor/rules/creation.py` — three, all consequences of the ones above. `06.2` registers the
   Cultural Blessing "immediately"; there is nothing to register it on until a hero exists,
   so `build_hero` takes the bus and registers everything once, in stage order. `06.3` says

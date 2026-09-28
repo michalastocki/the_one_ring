@@ -81,6 +81,7 @@ from tor.model.ids import (
 )
 from tor.rules.context import RulesContext
 from tor.rules.resources import recompute_conditions
+from tor.rules.shadow import register_shadow_conditions
 
 __all__ = [
     "STARTING_RANK",
@@ -1167,6 +1168,11 @@ def _register_effects(
     hero: Hero, draft: HeroDraft, culture: Culture, pack: ContentPack, bus: EffectBus
 ) -> None:
     """Everything creation grants, in stage order (``06.2``, ``06.5``, ``06.6``, ``06.8``)."""
+    # 11.2 asks for this at hero construction, permanently, so that no code path can
+    # forget to attach it: being Ill-favoured at maximum Shadow is a predicate on an
+    # always-on effect rather than a threshold the rules have to notice being crossed.
+    register_shadow_conditions(bus)
+
     source = EffectSource.culture(culture.id)
     bus.register(pack.instantiate(culture.cultural_blessing), source)
     if culture.cultural_weakness is not None:
