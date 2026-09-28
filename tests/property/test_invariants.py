@@ -6,7 +6,10 @@ worked example happens to cover.
 
 from __future__ import annotations
 
-from hypothesis import assume, given
+from functools import lru_cache
+from pathlib import Path
+
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from tor.dice import FEAT_FACES, FeatValue, ScriptedRandomness, SuccessDie
@@ -19,10 +22,34 @@ from tor.model.conditions import ResourcePool, StandardOfLiving, standard_of_liv
 from tor.model.derive import DerivedStat, Modifier
 from tor.model.gear import ArmourCategory, ArmourInstance, ArmourType, Gear
 from tor.model.hero import Hero
-from tor.model.ids import CallingId, CultureId, EffectId, HeroId, ItemId
+from tor.model.ids import AbilityId, CallingId, CultureId, EffectId, HeroId, ItemId
 from tor.rolls import Degree, Outcome, RollRequest, resolve
 from tor.rules.contest import ContestOutcome, ResistanceContest, evaluate
 from tor.rules.context import RulesContext
+from tor.rules.creation import (
+    AttributeChoice,
+    CallingChoice,
+    ExperienceChoice,
+    FeatureChoice,
+    GearChoice,
+    IdentityChoice,
+    RewardAndVirtueChoice,
+    RewardChoice,
+    SkillChoice,
+    VirtueChoice,
+    WeaponSelection,
+    begin_hero,
+    build_hero,
+    choose_attributes,
+    choose_calling,
+    choose_culture,
+    choose_features,
+    choose_gear,
+    choose_identity,
+    choose_reward_and_virtue,
+    choose_skills,
+    spend_previous_experience,
+)
 from tor.rules.resources import (
     ChangeSource,
     change_endurance,
@@ -44,6 +71,14 @@ LADDER: list[tuple[StandardOfLiving, int | None]] = [
 
 ratings = st.integers(min_value=0, max_value=6)
 modifiers = st.integers(min_value=-10, max_value=10)
+
+
+@lru_cache(maxsize=1)
+def example_pack():
+    """Loaded once: hypothesis re-enters the creation walk dozens of times per test."""
+    from tor.content.loader import load_pack
+
+    return load_pack(Path(__file__).resolve().parents[2] / "content" / "example")
 
 
 @st.composite
@@ -390,3 +425,161 @@ class TestContestTermination:
         contest = ResistanceContest(resistance=resistance, attempts_allowed=allowed)
         contest.abort("disaster")
         assert evaluate(contest) in set(ContestOutcome)
+
+
+class TestCreatedHeroes:
+    """19.5 — every invariant I1-I10 holds after any legal walk through the pipeline.
+
+    A hero coming off the creation pipeline is the one place the engine builds a whole
+    aggregate from scratch, so it is where a breach would first show. The strategies vary
+    every choice `example_folk` leaves open; the assertions are 06.10's post-conditions
+    plus the two threshold properties above.
+    """
+
+    ATTRIBUTE_SETS = st.integers(min_value=1, max_value=6)
+    PROFICIENCIES = st.sampled_from([AbilityId(p) for p in COMBAT_PROFICIENCIES])
+    FEATURES = st.sampled_from(["bold", "eager", "fair", "wilful"])
+    #: Capped at 3: 0->4 costs 11 on 05.10's Skill ladder, one more than the budget.
+    SKILL_TARGETS = st.integers(min_value=0, max_value=3)
+
+    @given(
+        set_index=ATTRIBUTE_SETS,
+        second_grant=PROFICIENCIES,
+        features=st.lists(FEATURES, min_size=2, max_size=2, unique=True),
+        awareness=SKILL_TARGETS,
+        take_helm=st.booleans(),
+        take_shield=st.booleans(),
+        fatigue=st.integers(min_value=0, max_value=30),
+    )
+    @settings(max_examples=40, deadline=None)
+    def test_the_post_conditions_hold_for_any_legal_walk(
+        self,
+        set_index: int,
+        second_grant: AbilityId,
+        features: list[str],
+        awareness: int,
+        take_helm: bool,
+        take_shield: bool,
+        fatigue: int,
+    ) -> None:
+        pack = example_pack()
+        draft = begin_hero()
+        draft, _ = choose_culture(draft, CultureId("example_folk"), pack)
+        draft, _ = choose_attributes(draft, AttributeChoice(set_index=set_index), pack)
+        draft, _ = choose_skills(
+            draft,
+            SkillChoice(
+                favoured=(AbilityId("hunting"),),
+                proficiencies=(AbilityId("swords"), second_grant),
+            ),
+            pack,
+        )
+        draft, _ = choose_features(draft, [FeatureChoice(EffectId(f)) for f in features], pack)
+        draft, _ = choose_calling(
+            draft,
+            CallingChoice(
+                CallingId("example_calling"),
+                favoured=(AbilityId("battle"), AbilityId("enhearten")),
+            ),
+            pack,
+        )
+        draft, _ = spend_previous_experience(
+            draft, ExperienceChoice(targets={AbilityId("awareness"): awareness}), pack
+        )
+        draft, _ = choose_gear(
+            draft,
+            GearChoice(
+                weapons=(WeaponSelection(ItemId("example_blade")),),
+                armour=ItemId("example_mail"),
+                helm=ItemId("example_helm") if take_helm else None,
+                shield=ItemId("example_buckler") if take_shield else None,
+            ),
+            pack,
+        )
+        draft, _ = choose_reward_and_virtue(
+            draft,
+            RewardAndVirtueChoice(
+                reward=RewardChoice(EffectId("cunning_make"), ItemId("example_mail")),
+                virtue=VirtueChoice(EffectId("hardiness")),
+            ),
+            pack,
+        )
+        draft, _ = choose_identity(draft, IdentityChoice(name="Property", age=30), pack)
+
+        bus = EffectBus()
+        hero = build_hero(draft, pack, bus=bus, hero_id=HeroId("p"))
+        ctx = RulesContext.single(hero.id, bus=bus, gear=pack)
+
+        hero.validate()  # I1-I10
+        assert hero.endurance == hero.max_endurance.value
+        assert hero.hope == hero.max_hope.value
+        assert hero.shadow == 0
+        assert hero.valour == hero.wisdom == 1
+        assert hero.skills[AbilityId("awareness")] == awareness
+
+        # Fatigue raises Load one-for-one (07.4), so this walks the hero across the
+        # Weary threshold from either side.
+        change_fatigue(hero, fatigue, ChangeSource.JOURNEY, ctx=ctx)
+        load = recompute_load(hero, ctx=ctx)
+        assert hero.conditions.weary == (hero.endurance <= load)
+        assert hero.conditions.miserable == (hero.shadow >= hero.hope)
+        hero.validate()
+
+    @given(
+        set_index=ATTRIBUTE_SETS,
+        features=st.lists(FEATURES, min_size=2, max_size=2, unique=True),
+    )
+    @settings(max_examples=20, deadline=None)
+    def test_registering_then_unregistering_the_virtue_restores_the_maximum(
+        self, set_index: int, features: list[str]
+    ) -> None:
+        # 19.5's last property, against the one effect creation registers that moves a
+        # derived stat: Hardiness is +2 max Endurance.
+        pack = example_pack()
+        draft = begin_hero()
+        draft, _ = choose_culture(draft, CultureId("example_folk"), pack)
+        draft, _ = choose_attributes(draft, AttributeChoice(set_index=set_index), pack)
+        draft, _ = choose_skills(
+            draft,
+            SkillChoice(
+                favoured=(AbilityId("hunting"),),
+                proficiencies=(AbilityId("swords"), AbilityId("bows")),
+            ),
+            pack,
+        )
+        draft, _ = choose_features(draft, [FeatureChoice(EffectId(f)) for f in features], pack)
+        draft, _ = choose_calling(
+            draft,
+            CallingChoice(
+                CallingId("example_calling"),
+                favoured=(AbilityId("battle"), AbilityId("enhearten")),
+            ),
+            pack,
+        )
+        draft, _ = spend_previous_experience(draft, ExperienceChoice(), pack)
+        draft, _ = choose_gear(
+            draft,
+            GearChoice(
+                weapons=(WeaponSelection(ItemId("example_blade")),),
+                armour=ItemId("example_mail"),
+            ),
+            pack,
+        )
+        draft, _ = choose_reward_and_virtue(
+            draft,
+            RewardAndVirtueChoice(
+                reward=RewardChoice(EffectId("cunning_make"), ItemId("example_mail")),
+                virtue=VirtueChoice(EffectId("hardiness")),
+            ),
+            pack,
+        )
+        draft, _ = choose_identity(draft, IdentityChoice(name="Property", age=30), pack)
+
+        bus = EffectBus()
+        hero = build_hero(draft, pack, bus=bus, hero_id=HeroId("p"))
+        with_virtue = hero.max_endurance.value
+
+        bus.unregister(EffectId("hardiness"))
+        hook_ctx = HookContext(hook=Hook.MODIFY_MAX_ENDURANCE, actor=hero)
+        without = bus.apply_numeric(Hook.MODIFY_MAX_ENDURANCE, hook_ctx, hero.max_endurance.base)
+        assert without.value == hero.max_endurance.base == with_virtue - 2

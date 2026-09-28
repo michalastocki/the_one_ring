@@ -49,17 +49,17 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–7, 9 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
-`tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, and the
+Build steps 1–9 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+`tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, the
 three shared rules leaves `tor.rules.resources`, `tor.rules.contest` and
-`tor.rules.injury`, plus `content/example/`. That is the pure core, all three seams, and the
-tier every later subsystem rests on. Character creation (step 8), Shadow (10), and
-everything from combat onward are not yet implemented, nor are the session layer, the API
-and the CLI.
+`tor.rules.injury`, and `tor.rules.creation`, plus `content/example/`. That is the pure
+core, all three seams, the tier every later subsystem rests on, and the pipeline that turns
+a content pack into a playable hero and Company. Shadow (10) and everything from combat
+onward are not yet implemented, nor are the session layer, the API and the CLI.
 
-Steps 8 and 9 are taken **out of order**: `tor.rules.contest` and `tor.rules.injury` landed
-before `tor.rules.creation`. Neither depends on the other, and the two small shared leaves
-complete the tier, so creation gets an undiluted change of its own.
+Steps 8 and 9 were taken **out of order**: `tor.rules.contest` and `tor.rules.injury`
+landed before `tor.rules.creation`, so the shared-leaf tier was complete before the first
+subsystem was built on it.
 
 Content packs are validated in two passes. The JSON Schemas in `tor/content/schema/` check
 shape — required fields, types, enumerated values, arity, and any field the format does not
@@ -67,7 +67,7 @@ define; `05.1.1`'s referential and semantic checks then run over the merged stac
 schemas own everything a schema can express, so the loader holds no second implementation
 of the same rule.
 
-Three deliberate deviations from the spec are recorded, each in the module that makes it:
+Deliberate deviations from the spec are recorded, each in the module that makes it:
 
 - `tor/rolls.py` — `01.1` lists `tor.rolls`, `tor.effects` and `tor.tables` as independent
   siblings, while `02.3.1` puts `build_request` in `tor.rolls` and has it read the
@@ -87,6 +87,19 @@ Three deliberate deviations from the spec are recorded, each in the module that 
   scoreless contest, while the prose two lines below says the two adapters differ on
   exactly that. The shared engine returns `TOTAL_FAILURE`; the council adapter promotes it,
   because for a council "every attempt failed" *is* a Disaster.
+- `tor/tables.py` — `01.3`'s DRY catalogue puts `CostLadder` in `tor.rules.progression`,
+  but `06.6` spends a Previous Experience budget down the same ladder during creation, and
+  `01.1` forbids one subsystem from importing another. The ladder sits at L2 instead, which
+  both may read downward.
+- `tor/rules/creation.py` — three, all consequences of the ones above. `06.2` registers the
+  Cultural Blessing "immediately"; there is nothing to register it on until a hero exists,
+  so `build_hero` takes the bus and registers everything once, in stage order. `06.3` says
+  to freeze the three Attribute TNs alongside the maxima; they pass through
+  `MODIFY_ATTRIBUTE_TN`, so `04.7` forbids storing them and `tor.rolls.attribute_tn`
+  derives them per roll. `06.1` gives the draft one `favoured` set and one `features`
+  tuple although stage 5 adds to both, which would make the mandated cascade unable to
+  withdraw the Calling's grant alone; `calling_favoured` and `calling_feature` are separate
+  fields, unioned at materialisation.
 
 ## Development
 

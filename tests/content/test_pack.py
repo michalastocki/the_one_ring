@@ -708,6 +708,50 @@ class TestLookups:
         with pytest.raises(ContentError, match="no such culture"):
             pack.culture("no_such_folk")
 
+    def test_the_lookups_the_creation_pipeline_needs(self, pack: ContentPack) -> None:
+        assert pack.patron("example_patron").fellowship_bonus == 1
+        assert pack.undertaking("strengthen_fellowship").name
+        with pytest.raises(ContentError, match="no such patron"):
+            pack.patron("no_such_patron")
+        with pytest.raises(ContentError, match="no such undertaking"):
+            pack.undertaking("no_such_undertaking")
+
+    def test_the_standard_of_living_ladder_reads_as_a_tier_and_as_a_pair(
+        self, pack: ContentPack
+    ) -> None:
+        # 03.7's `standard_of_living_for` takes the (tier, threshold) pairs; 06.7 wants
+        # the whole row, for the Useful Item count and the mount's Vigour.
+        assert pack.living_tier(StandardOfLiving.COMMON).useful_items == 2
+        assert pack.living_tier(StandardOfLiving.POOR).mount_vigour is None
+        ladder = dict(pack.living_ladder())
+        assert ladder[StandardOfLiving.POOR] is None
+        assert ladder[StandardOfLiving.COMMON] == 30
+        assert len(ladder) == len(StandardOfLiving)
+
+    def test_the_two_experience_ladders_are_reachable_and_distinct(self, pack: ContentPack) -> None:
+        # 05.10 opens by warning against conflating them, so the group is never defaulted.
+        previous = pack.cost_ladder("previous_experience", "skills")
+        advancement = pack.cost_ladder("advancement", "ability")
+        assert previous.cost_to_raise(0, 1) != advancement.cost_to_raise(0, 1)
+        assert int(pack.experience_costs()["previous_experience"]["budget"]) == 10
+
+    def test_an_unknown_ladder_is_a_content_error(self, pack: ContentPack) -> None:
+        with pytest.raises(ContentError, match="has no 'previous_experience'/'ranks' ladder"):
+            pack.cost_ladder("previous_experience", "ranks")
+        with pytest.raises(ContentError, match="has no 'nonsense'/'skills' ladder"):
+            pack.cost_ladder("nonsense", "skills")
+
+    def test_instantiate_layers_the_players_choice_over_the_declaration(
+        self, pack: ContentPack
+    ) -> None:
+        # 04.2: `requires_choice` announces what the player names at acquisition, and
+        # this is the bridge that carries it into the live effect.
+        assert pack.effect("mastery").requires_choice == {"skills": 2}
+        assert pack.instantiate("mastery").params["skills"] == []
+        chosen = pack.instantiate("mastery", {"skills": ["stealth", "riddle"]})
+        assert chosen.params["skills"] == ["stealth", "riddle"]
+        assert pack.instantiate("mastery").params["skills"] == [], "the declaration is shared"
+
     def test_the_engine_ships_no_content(self, pack: ContentPack) -> None:
         # The point of the whole layer: the 18 Skills and 4 Proficiencies are engine
         # knowledge, everything else comes from the pack.

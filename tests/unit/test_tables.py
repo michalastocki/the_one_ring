@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from tor.dice import FeatFace, ScriptedRandomness
-from tor.errors import ContentError
-from tor.tables import DieKind, LookupTable, TableRow, rows_from_json
+from tor.errors import ContentError, RuleViolation
+from tor.tables import CostLadder, DieKind, LookupTable, TableRow, rows_from_json
 
 
 def feat_table(rows: list[TableRow[str]], table_id: str = "t") -> LookupTable[str]:
@@ -256,3 +258,62 @@ class TestRerollGuards:
         )
         with pytest.raises(ContentError, match="self-referential"):
             table.resolve(ScriptedRandomness(successes=[1] * 20))
+
+
+class TestCostLadder:
+    """Pattern P14, shared by Previous Experience (06.6) and advancement (15.4)."""
+
+    SKILLS: ClassVar[list[dict[str, int]]] = [
+        {"to": 1, "cost": 1},
+        {"to": 2, "cost": 2},
+        {"to": 3, "cost": 3},
+        {"to": 4, "cost": 5},
+    ]
+
+    def ladder(self, rows=None, ladder_id: str = "skills") -> CostLadder:
+        return CostLadder.from_rows(self.SKILLS if rows is None else rows, ladder_id=ladder_id)
+
+    def test_the_mandatory_vector(self) -> None:
+        # 19.4: raising a Skill from 1 to 4 costs exactly the full 10-point budget.
+        assert self.ladder().cost_to_raise(1, 4) == 10
+
+    def test_each_level_is_paid_for_individually(self) -> None:
+        # 06.6: several levels in one ability cost the sum, not the top level's price.
+        assert self.ladder().cost_to_raise(0, 2) == 3
+
+    def test_a_rating_may_be_bought_from_zero(self) -> None:
+        assert self.ladder().cost_to_raise(0, 1) == 1
+
+    def test_standing_still_is_free(self) -> None:
+        assert self.ladder().cost_to_raise(3, 3) == 0
+
+    def test_the_floor_and_ceiling_come_from_the_rows(self) -> None:
+        rank = self.ladder([{"to": 2, "cost": 8}, {"to": 3, "cost": 12}], ladder_id="rank")
+        assert (rank.floor, rank.ceiling) == (2, 3)
+        assert (self.ladder().floor, self.ladder().ceiling) == (1, 4)
+
+    def test_a_target_the_ladder_does_not_price_is_a_rule_violation(self) -> None:
+        # 06.6 puts it exactly this way: the ladder simply has no entry, which is the
+        # same thing as the rating being unreachable.
+        with pytest.raises(RuleViolation, match=r"prices ratings 1\.\.4"):
+            self.ladder().cost_to_raise(3, 5)
+
+    def test_lowering_a_rating_is_a_caller_bug(self) -> None:
+        with pytest.raises(RuleViolation, match="cannot lower a rating"):
+            self.ladder().cost_to_raise(3, 1)
+
+    def test_a_row_needs_both_a_target_and_a_cost(self) -> None:
+        with pytest.raises(ContentError, match="needs both 'to' and 'cost'"):
+            self.ladder([{"to": 1}])
+
+    def test_a_rating_priced_twice_is_rejected(self) -> None:
+        with pytest.raises(ContentError, match="priced twice"):
+            self.ladder([{"to": 1, "cost": 1}, {"to": 1, "cost": 2}])
+
+    def test_an_empty_ladder_is_rejected(self) -> None:
+        with pytest.raises(ContentError, match="at least one row"):
+            self.ladder([])
+
+    def test_a_gap_makes_a_rating_unbuyable_and_is_rejected(self) -> None:
+        with pytest.raises(ContentError, match=r"skips ratings \[2, 3\]"):
+            self.ladder([{"to": 1, "cost": 1}, {"to": 4, "cost": 5}])

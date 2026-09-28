@@ -208,12 +208,18 @@ def recompute_load(hero: Hero, *, ctx: RulesContext) -> int:
     outright) live. An item's effective Load is floored at zero: ``07.4`` does not say so,
     but a -2 modifier on a Load-1 helm must not make a hero lighter for wearing it.
 
+    The dispatch names the item twice: ``item`` for a listener that wants to inspect it, and
+    ``item_ref`` so the bus can keep one item's Rewards off the item beside it — see
+    ``tor.effects.bus._in_item_scope``.
+
     Never consumes a usage budget — see :data:`~tor.rules.context.DERIVED_STAT_HOOKS`.
     """
     bus = ctx.bus(hero.id)
     war_gear = 0
     for item, base in _base_loads(hero.gear, ctx.gear):
-        hook_ctx = ctx.hook_context(Hook.MODIFY_ITEM_LOAD, hero, item=item, base_load=base)
+        hook_ctx = ctx.hook_context(
+            Hook.MODIFY_ITEM_LOAD, hero, item=item, item_ref=item.ref, base_load=base
+        )
         war_gear += max(0, bus.apply_numeric(Hook.MODIFY_ITEM_LOAD, hook_ctx, base).value)
     return war_gear + treasure_load(hero) + hero.fatigue
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from tor.content.entities import (
     Adversary,
@@ -21,9 +21,10 @@ from tor.content.entities import (
 from tor.effects.bus import Effect
 from tor.effects.library import build_effect
 from tor.errors import ContentError
+from tor.model.conditions import StandardOfLiving
 from tor.model.gear import ArmourType, ShieldType, WeaponType
 from tor.model.ids import EffectId
-from tor.tables import LookupTable
+from tor.tables import CostLadder, LookupTable
 
 __all__ = ["ContentPack"]
 
@@ -133,6 +134,49 @@ class ContentPack:
     def adversary(self, adversary_id: str) -> Adversary:
         return _require(self.adversaries, adversary_id, "adversary")
 
+    def patron(self, patron_id: str) -> Patron:
+        return _require(self.patrons, patron_id, "patron")
+
+    def undertaking(self, undertaking_id: str) -> Undertaking:
+        return _require(self.undertakings, undertaking_id, "undertaking")
+
+    def living_tier(self, tier: StandardOfLiving) -> StandardOfLivingTier:
+        """One row of the Standard of Living table (``05.9``).
+
+        The loader's completeness check guarantees all six tiers are present, so a missing
+        one would be a pack that never loaded.
+        """
+        for row in self.standards_of_living:
+            if row.tier is tier:
+                return row
+        raise ContentError(  # pragma: no cover - the loader rejects an incomplete ladder
+            f"no such standard of living tier: {tier.name.lower()!r}", entity_id=tier.name.lower()
+        )
+
+    def living_ladder(self) -> tuple[tuple[StandardOfLiving, int | None], ...]:
+        """The ``(tier, threshold)`` pairs ``standard_of_living_for`` reads (``03.7``)."""
+        return tuple((row.tier, row.treasure_threshold) for row in self.standards_of_living)
+
+    def experience_costs(self) -> Mapping[str, Any]:
+        """The whole ``experience_costs`` row (``05.10``) — budgets and heir caps included."""
+        return cast("Mapping[str, Any]", self.table("experience_costs").lookup(1))
+
+    def cost_ladder(self, group: str, ladder: str) -> CostLadder:
+        """One ladder from ``05.10``, e.g. ``("previous_experience", "skills")``.
+
+        ``05.10`` opens with "Two separate ladders. Do not conflate them", so the group is
+        never defaulted: a caller has to say which of the two it means.
+        """
+        costs = self.experience_costs()
+        try:
+            rows = costs[group][ladder]
+        except (KeyError, TypeError) as exc:
+            raise ContentError(
+                f"experience_costs has no {group!r}/{ladder!r} ladder",
+                entity_id="experience_costs",
+            ) from exc
+        return CostLadder.from_rows(rows, ladder_id=f"{group}.{ladder}")
+
     def table(self, table_id: str) -> LookupTable[Any]:
         return _require(self.tables, table_id, "table")
 
@@ -142,17 +186,21 @@ class ContentPack:
     def effects_of_kind(self, kind: str) -> dict[str, EffectDefinition]:
         return {k: v for k, v in self.effects.items() if v.kind == kind}
 
-    def instantiate(self, effect_id: str) -> Effect:
+    def instantiate(self, effect_id: str, params: Mapping[str, Any] | None = None) -> Effect:
         """Build the live :class:`Effect` for a declaration (``04.5``).
 
         The bridge from a pack's declarative row to the object an ``EffectBus`` registers.
         Everything about *which* effects a hero carries is the caller's business — this
         only turns one id into one effect.
+
+        ``params`` layers the player's choices at acquisition over the declaration's own —
+        which two Skills *Mastery* favours, which Attribute *Prowess* lowers, which creature
+        type a Hatred names. That is what ``EffectDefinition.requires_choice`` announces, and
+        what lets one shared definition serve every hero who takes it (``04.2``).
         """
         definition = self.effect(effect_id)
-        return build_effect(
-            EffectId(definition.id), definition.kind, definition.factory, definition.params
-        )
+        merged = {**definition.params, **(params or {})}
+        return build_effect(EffectId(definition.id), definition.kind, definition.factory, merged)
 
 
 def _require(section: Mapping[str, V], key: str, what: str) -> V:
