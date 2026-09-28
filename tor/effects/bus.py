@@ -35,6 +35,7 @@ __all__ = [
     "Predicate",
     "UsagePolicy",
     "UsageScope",
+    "fold_numeric",
 ]
 
 
@@ -152,6 +153,31 @@ class _Registration:
     source: EffectSource
 
 
+def fold_numeric(contributions: Iterable[Contribution], base: int) -> DerivedStat:
+    """Fold a hook's value-shaped contributions onto ``base`` (pattern P18).
+
+    Additive contributions become deltas. An ``int``-valued replacement becomes a
+    :class:`Modifier` with ``replacement`` set, which ``DerivedStat.value`` resolves ahead of
+    the base — that is how Mithril Make, which ``04.3.2`` names explicitly for
+    ``MODIFY_ITEM_LOAD``, replaces an item's Load outright rather than adjusting it. A
+    replacement carrying anything but an ``int`` is not a value for this stat and is left to
+    whichever caller collects that hook directly.
+
+    Separate from :meth:`EffectBus.apply_numeric`, which is the usual way in, so that a
+    caller who must *also* :meth:`~tor.rules.context.RulesContext.consume` what contributed
+    can collect once and fold what it already has, instead of dispatching the hook twice.
+    """
+    modifiers: list[Modifier] = []
+    for contribution in contributions:
+        if isinstance(contribution, NumericContribution):
+            modifiers.append(Modifier(source=contribution.source, delta=contribution.delta))
+        elif isinstance(contribution, ReplacementContribution) and isinstance(
+            contribution.value, int
+        ):
+            modifiers.append(Modifier(source=contribution.source, replacement=contribution.value))
+    return DerivedStat(base=base, modifiers=tuple(modifiers))
+
+
 def _in_item_scope(source: EffectSource, ctx: HookContext) -> bool:
     """An item's own qualities fire only for that item, when the hook names one.
 
@@ -244,26 +270,8 @@ class EffectBus:
         return gathered
 
     def apply_numeric(self, hook: Hook, ctx: HookContext, base: int) -> DerivedStat:
-        """Collect a hook's value-shaped contributions into a :class:`DerivedStat`.
-
-        Additive contributions become deltas. An ``int``-valued replacement becomes a
-        :class:`Modifier` with ``replacement`` set, which ``DerivedStat.value`` resolves
-        ahead of the base — that is how Mithril Make, which ``04.3.2`` names explicitly for
-        ``MODIFY_ITEM_LOAD``, replaces an item's Load outright rather than adjusting it.
-        A replacement carrying anything but an ``int`` is not a value for this stat and is
-        left to whichever caller collects that hook directly.
-        """
-        modifiers: list[Modifier] = []
-        for contribution in self.collect(hook, ctx):
-            if isinstance(contribution, NumericContribution):
-                modifiers.append(Modifier(source=contribution.source, delta=contribution.delta))
-            elif isinstance(contribution, ReplacementContribution) and isinstance(
-                contribution.value, int
-            ):
-                modifiers.append(
-                    Modifier(source=contribution.source, replacement=contribution.value)
-                )
-        return DerivedStat(base=base, modifiers=tuple(modifiers))
+        """Collect a hook's value-shaped contributions into a :class:`DerivedStat`."""
+        return fold_numeric(self.collect(hook, ctx), base)
 
     # -- usage budgets ---------------------------------------------------------------
 

@@ -50,7 +50,7 @@ from enum import StrEnum
 from typing import Any
 
 from tor.dice import Randomness
-from tor.effects.bus import Effect, EffectBus, EffectKind, EffectSource
+from tor.effects.bus import Effect, EffectBus, EffectKind, EffectSource, fold_numeric
 from tor.effects.hooks import FlagContribution, Hook, HookContext
 from tor.errors import RuleViolation, StateError
 from tor.events import Event, EventKind
@@ -370,8 +370,12 @@ def gain_shadow(
     hook_ctx = ctx.hook_context(
         Hook.MODIFY_SHADOW_GAIN, hero, source=str(source), **{f"source_{source.value}": True}
     )
-    gained = max(0, ctx.bus(hero.id).apply_numeric(Hook.MODIFY_SHADOW_GAIN, hook_ctx, gained).value)
-    ctx.consume(hero.id, ctx.bus(hero.id).collect(Hook.MODIFY_SHADOW_GAIN, hook_ctx), hook_ctx)
+    # Collected once and then both folded and consumed: an effect that reduces Shadow may
+    # carry a usage budget, and dispatching the hook a second time to find out which ones
+    # contributed would fire every listener twice.
+    contributions = ctx.bus(hero.id).collect(Hook.MODIFY_SHADOW_GAIN, hook_ctx)
+    gained = max(0, fold_numeric(contributions, gained).value)
+    ctx.consume(hero.id, contributions, hook_ctx)
 
     wanted = gained + (1 if add_scar else 0)
     ceiling = hero.max_hope.value
