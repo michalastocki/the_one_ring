@@ -87,6 +87,63 @@
     "hook": "SHORT_REST_COUNTS_AS_PROLONGED",
     "flag": "counts_as_prolonged"
    }
+  },
+  {
+   "id": "example_cv_fierce_shot",
+   "name": "Fierce Shot",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "set_flag",
+   "params": {
+    "hook": "ON_PIERCING_BLOW",
+    "flag": "ill_favoured",
+    "predicate": {
+     "flag": "ranged"
+    }
+   }
+  },
+  {
+   "id": "example_cv_long_bow",
+   "name": "Bow of the Wood",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "numeric_modifier",
+   "params": {
+    "hook": "OPENING_VOLLEY_COUNT",
+    "delta": 1
+   }
+  },
+  {
+   "id": "second_cv_second_wind",
+   "name": "Second Wind",
+   "culture": "second_folk",
+   "min_wisdom": 2,
+   "factory": "offer_action",
+   "params": {
+    "hook": "ON_COMBAT_END",
+    "action": "restore_endurance",
+    "payload": {
+     "stat": "heart",
+     "unless": [
+      "wounded",
+      "miserable"
+     ]
+    }
+   }
+  },
+  {
+   "id": "second_cv_stubborn",
+   "name": "Stubborn as Stone",
+   "culture": "second_folk",
+   "min_wisdom": 2,
+   "factory": "offer_action",
+   "params": {
+    "hook": "ON_WOUND_RECEIVED",
+    "action": "steady_self",
+    "payload": {
+     "hope": 1
+    }
+   }
   }
  ]
 }

@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from tor.errors import RuleViolation
 from tor.model.conditions import CreatureType, DriveKind, ResourcePool
-from tor.model.ids import AdversaryId, AdversaryInstanceId, EffectId
+from tor.model.ids import AbilityId, AdversaryId, AdversaryInstanceId, EffectId
 
 __all__ = [
     "Adversary",
@@ -119,6 +119,18 @@ class AdversaryInstance:
     @property
     def total_drive(self) -> int:
         return self.drive.current + self.bonus_drive
+
+    def rating(self, ability: AbilityId) -> int:
+        """Success dice for a roll that names no attack form (``12.1``, ``01.5``).
+
+        An adversary has attack forms, not abilities: the simplified sheet carries one
+        rating per form and no Skills at all. Combat always passes the chosen form's own
+        rating explicitly, so this is the answer for everything else — the best the
+        creature can do — and it is what makes an ``AdversaryInstance`` satisfy
+        ``tor.rolls.RollingCharacter``, which is why one roll pipeline serves both sheets.
+        """
+        del ability
+        return max((attack.rating for attack in self.template.attacks), default=0)
 
     def spend_drive(self, n: int = 1) -> None:
         """Spend from the bonus pool first, then the creature's own (``14.6``).

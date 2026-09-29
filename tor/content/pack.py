@@ -17,10 +17,12 @@ from tor.content.entities import (
     SongTemplate,
     StandardOfLivingTier,
     Undertaking,
+    stat_block,
 )
 from tor.effects.bus import Effect
 from tor.effects.library import build_effect
 from tor.errors import ContentError
+from tor.model.adversary import Adversary as ModelAdversary
 from tor.model.conditions import StandardOfLiving
 from tor.model.gear import ArmourType, ShieldType, WeaponType
 from tor.model.ids import EffectId
@@ -136,6 +138,10 @@ class ContentPack:
 
     def shadow_path(self, path_id: str) -> ShadowPath:
         return _require(self.shadow_paths, path_id, "shadow path")
+
+    def stat_block(self, adversary_id: str) -> ModelAdversary:
+        """The model sheet for one adversary (``12.1``), ready to instantiate from."""
+        return stat_block(self.adversary(adversary_id))
 
     def patron(self, patron_id: str) -> Patron:
         return _require(self.patrons, patron_id, "patron")

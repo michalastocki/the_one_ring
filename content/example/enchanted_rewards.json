@@ -24,6 +24,13 @@
    "item_types": ["weapon"], "requires_bane": true,
    "factory": "drain_drive_on_hit", "params": {"amount": 1, "per_icon": 1}},
 
+  {"id": "cleaving", "name": "Cleaving",
+   "craftsmanship": ["dwarven"],
+   "item_types": ["weapon"], "requires_bane": false,
+   "factory": "offer_action",
+   "params": {"hook": "ON_KILL", "action": "extra_attack",
+              "payload": {"against": "engaged"}}},
+
   {"id": "flame_of_hope", "name": "Flame of Hope",
    "craftsmanship": ["numenorean"],
    "item_types": ["weapon"], "requires_bane": false,

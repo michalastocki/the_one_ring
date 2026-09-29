@@ -11,7 +11,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from tor.model.conditions import DriveKind, StandardOfLiving
+from tor.model.adversary import Adversary as ModelAdversary
+from tor.model.adversary import AdversaryAttack, AdversarySize
+from tor.model.conditions import CreatureType, DriveKind, StandardOfLiving
 from tor.model.gear import ArmourType, Craftsmanship, ShieldType, WeaponType
 from tor.model.ids import AbilityId, AdversaryId, CallingId, CultureId, EffectId, ItemId
 
@@ -30,6 +32,7 @@ __all__ = [
     "SongTemplate",
     "StandardOfLivingTier",
     "Undertaking",
+    "stat_block",
 ]
 
 
@@ -196,6 +199,45 @@ class Adversary:
     fell_abilities: tuple[EffectId, ...] = ()
     distinctive_features: tuple[EffectId, ...] = ()
     icon_inverted: bool = True
+
+
+def stat_block(row: Adversary) -> ModelAdversary:
+    """Turn a parsed row into the sheet the combat rules read (``12.1``).
+
+    Two ``Adversary`` types exist on purpose: this module holds what the JSON said, and
+    ``tor.model.adversary`` holds what the rules operate on — typed enums, a frozen set of
+    creature types, attack forms rather than raw mappings. Keeping the parse separate from
+    the model is what lets ``05.1``'s schemas own the shape of the file without the rules
+    ever seeing a ``dict``.
+    """
+    return ModelAdversary(
+        id=row.id,
+        name=row.name,
+        attribute_level=row.attribute_level,
+        endurance=row.endurance,
+        might=row.might,
+        drive_kind=row.drive_kind,
+        drive=row.drive,
+        parry=row.parry,
+        armour=row.armour,
+        attacks=tuple(
+            AdversaryAttack(
+                name=str(attack["name"]),
+                rating=int(attack["rating"]),
+                damage=int(attack["damage"]),
+                injury=int(attack["injury"]),
+                special_damage=tuple(attack.get("special_damage", ())),
+                ranged=bool(attack.get("ranged", False)),
+            )
+            for attack in row.attacks
+        ),
+        always_available_special_damage=row.always_available_special_damage,
+        fell_abilities=row.fell_abilities,
+        distinctive_features=row.distinctive_features,
+        creature_types=frozenset(CreatureType(t) for t in row.creature_types),
+        size=AdversarySize(row.size),
+        icon_inverted=row.icon_inverted,
+    )
 
 
 #: Gear types are reused from tor.model rather than re-declared: a WeaponType is the same

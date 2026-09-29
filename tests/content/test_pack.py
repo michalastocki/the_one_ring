@@ -890,21 +890,6 @@ class TestHookCoverage:
     #: covers every EffectKind (19.7); council and fellowship land at steps 13 and 15.
     AWAITING_SUBSYSTEM = frozenset(
         {
-            # combat (08) — build step 11
-            Hook.MODIFY_ATTACK_TN,
-            Hook.MODIFY_TARGET_PROTECTION_ROLL,
-            Hook.SPECIAL_DAMAGE_OPTIONS,
-            Hook.ON_PIERCING_BLOW,
-            Hook.ON_KILL,
-            Hook.MODIFY_WOUND_SEVERITY_ROLL,
-            Hook.ON_WOUND_RECEIVED,
-            Hook.ON_ROUND_START,
-            Hook.ON_ROUND_END,
-            Hook.ON_COMBAT_END,
-            Hook.STANCE_OPTIONS,
-            Hook.OPENING_VOLLEY_COUNT,
-            Hook.MODIFY_ENGAGEMENT,
-            Hook.WOUND_INTERCEPT,
             # journey (10) — build step 12
             Hook.MODIFY_JOURNEY_EVENT_ROLL,
             Hook.JOURNEY_ROLE_LIMITS,
