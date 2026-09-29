@@ -33,7 +33,7 @@
    "min_wisdom": 2,
    "factory": "bonus_dice",
    "params": {
-    "purpose": "shadow_test",
+    "hook": "MODIFY_SHADOW_TEST",
     "source": "sorcery",
     "dice": 1
    }

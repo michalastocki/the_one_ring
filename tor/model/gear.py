@@ -134,6 +134,18 @@ class _Instance:
     def plot_immune(self) -> bool:
         return self.upgrades.plot_immune
 
+    @property
+    def ref(self) -> str:
+        """The key ``EffectSource.item`` registers this instance's own effects under.
+
+        ``04.5`` registers a Reward with ``EffectSource.item(instance_id)``, and the bus
+        uses that ref to keep an item's qualities from reaching the item beside it — Cunning
+        Make on a mail shirt must not lighten the bow. Two upgraded items on one hero
+        therefore need distinct refs, which is what ``name`` is for; an unnamed item falls
+        back to its type, which is unambiguous while a hero carries one of each.
+        """
+        return self.name or str(self.type_id)
+
 
 @dataclass(slots=True)
 class WeaponInstance(_Instance):

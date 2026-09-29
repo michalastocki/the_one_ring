@@ -11,17 +11,18 @@ domain is a load-time :class:`~tor.errors.ContentError`, never a surprise mid-se
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
 
 from tor.dice import FEAT_FACES, FeatFace, FeatValue, Randomness
-from tor.errors import ContentError
+from tor.errors import ContentError, RuleViolation
 
 __all__ = [
     "FEAT_DOMAIN",
     "SUCCESS_DOMAIN",
+    "CostLadder",
     "DieKind",
     "LookupTable",
     "Sentinel",
@@ -268,3 +269,89 @@ def rows_from_json(
                     entity_id=table_id,
                 )
     return tuple(parsed)
+
+
+@dataclass(frozen=True, slots=True)
+class CostLadder:
+    """Attaining rating N costs ``C(N)``; several levels cost the sum (pattern P14).
+
+    .. note::
+       ``01.3``'s DRY catalogue puts this in ``tor.rules.progression``. It cannot live
+       there: ``06.6`` spends a Previous Experience budget down the very same ladder during
+       character creation, and ``01.1`` forbids one L4 subsystem from importing another.
+       Rather than a second implementation — precisely what the catalogue exists to
+       prevent — the ladder sits at L2 beside :class:`LookupTable`, which both ``05.10``
+       ladders and every subsystem above may read downward.
+
+    ``05.10`` carries two groups of these, and warns against conflating them:
+    ``previous_experience`` (creation and heirs only) and ``advancement`` (Fellowship
+    Phases). Which group a caller reads is the caller's business; the arithmetic is here.
+    """
+
+    id: str
+    #: Rating attained -> the price of attaining it. Contiguous from :attr:`floor`.
+    costs: Mapping[int, int]
+
+    @property
+    def floor(self) -> int:
+        """The lowest rating the ladder prices. 1 for abilities, 2 for VALOUR and WISDOM."""
+        return min(self.costs)
+
+    @property
+    def ceiling(self) -> int:
+        """The highest rating the ladder prices — 4 for Skills, 3 for Proficiencies."""
+        return max(self.costs)
+
+    def cost_to_raise(self, current: int, target: int) -> int:
+        """The sum of each level's price, from ``current + 1`` through ``target`` (``06.6``).
+
+        Raising a Skill from 1 to 4 costs ``2 + 3 + 5``. A target the ladder does not price
+        is a :class:`~tor.errors.RuleViolation` — ``06.6`` puts it exactly that way: "the
+        ladder simply has no entry, which is the same thing".
+        """
+        if target < current:
+            raise RuleViolation(
+                f"{self.id} cannot lower a rating from {current} to {target}",
+                rule_reference="cost_ladder_direction",
+            )
+        missing = [level for level in range(current + 1, target + 1) if level not in self.costs]
+        if missing:
+            raise RuleViolation(
+                f"the {self.id} ladder prices ratings {self.floor}..{self.ceiling}, "
+                f"not {sorted(missing)}",
+                rule_reference="cost_ladder_ceiling",
+                suggestion=f"the highest rating it can buy is {self.ceiling}",
+            )
+        return sum(self.costs[level] for level in range(current + 1, target + 1))
+
+    @classmethod
+    def from_rows(cls, raw: Sequence[Mapping[str, Any]], *, ladder_id: str) -> CostLadder:
+        """Parse ``[{"to": 1, "cost": 1}, ...]`` as ``05.10`` writes it.
+
+        The levels must be contiguous: a ladder that prices ratings 1, 2 and 4 would
+        silently make rating 3 unbuyable, which is a content bug rather than a rule.
+        """
+        costs: dict[int, int] = {}
+        for index, row in enumerate(raw):
+            pointer = f"/{index}"
+            if "to" not in row or "cost" not in row:
+                raise ContentError(
+                    "a cost ladder row needs both 'to' and 'cost'",
+                    pointer=pointer,
+                    entity_id=ladder_id,
+                )
+            level = int(row["to"])
+            if level in costs:
+                raise ContentError(
+                    f"rating {level} is priced twice", pointer=pointer, entity_id=ladder_id
+                )
+            costs[level] = int(row["cost"])
+        if not costs:
+            raise ContentError("a cost ladder needs at least one row", entity_id=ladder_id)
+        expected = set(range(min(costs), max(costs) + 1))
+        if gaps := expected - set(costs):
+            raise ContentError(
+                f"the cost ladder skips ratings {sorted(gaps)}, which no purchase could reach",
+                entity_id=ladder_id,
+            )
+        return cls(id=ladder_id, costs=costs)

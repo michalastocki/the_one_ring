@@ -10,8 +10,8 @@
    "craftsmanship": ["dwarven"],
    "item_types": ["armour", "helm", "shield"], "requires_bane": false,
    "supersedes": "cunning_make",
-   "factory": "numeric_modifier",
-   "params": {"hook": "MODIFY_ITEM_LOAD", "delta": -4}},
+   "factory": "replace_value",
+   "params": {"hook": "MODIFY_ITEM_LOAD", "value": 1}},
 
   {"id": "superior_keen", "name": "Superior Keen",
    "craftsmanship": ["elven", "numenorean"],
