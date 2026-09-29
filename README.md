@@ -49,13 +49,14 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–10 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+Build steps 1–11 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
 `tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, all four
 shared rules leaves — `tor.rules.resources`, `tor.rules.contest`, `tor.rules.injury` and
-`tor.rules.shadow` — and `tor.rules.creation`, plus `content/example/`. That is the pure
-core, all three seams, the whole leaf tier every later subsystem rests on, and the pipeline
-that turns a content pack into a playable hero and Company. Everything from combat (11)
-onward is not yet implemented, nor are the session layer, the API and the CLI.
+`tor.rules.shadow` — plus `tor.rules.creation`, `tor.rules.combat` and `content/example/`.
+That is the pure core, all three seams, the whole leaf tier every later subsystem rests on,
+the pipeline that turns a content pack into a playable hero and Company, and the fight they
+get into. Journey (12) onward is not yet implemented, nor are the session layer, the API
+and the CLI.
 
 Steps 8 and 9 were taken **out of order**: `tor.rules.contest` and `tor.rules.injury`
 landed before `tor.rules.creation`, so most of the shared-leaf tier was complete before the
@@ -95,6 +96,12 @@ Deliberate deviations from the spec are recorded, each in the module that makes 
   will, while its own note three lines below says "Shadow becomes exactly the scar count,
   which is at least 1". Both cannot hold for a hero who has hardened before: the block would
   leave them with three Scars and Shadow 1, breaching invariant I6. The note wins.
+- `tor/rules/combat/attack.py` — `08.5` writes one `resolve_attack` that rolls the attack,
+  spends the Success icons, checks the Piercing Blow and rolls PROTECTION. It cannot be one
+  function: `08.6` puts a player decision strictly between the roll and the Piercing Blow
+  check, because Pierce is retroactive within the same attack, and `01.4` forbids a rule
+  function from stopping to ask. `roll_attack` → `resolve_attack` → `apply_attack` is the
+  same split `01.4` mandates everywhere else, with the roll pulled out in front of it.
 - `tor/rules/creation.py` — three, all consequences of the ones above. `06.2` registers the
   Cultural Blessing "immediately"; there is nothing to register it on until a hero exists,
   so `build_hero` takes the bus and registers everything once, in stage order. `06.3` says

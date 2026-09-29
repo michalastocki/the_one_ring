@@ -74,6 +74,22 @@ class EventKind(StrEnum):
     BOUT_OF_MADNESS = "bout_of_madness"
     FLAW_GAINED = "flaw_gained"
 
+    # -- combat (``08``, ``12``) --------------------------------------------------------
+    COMBAT_BEGAN = "combat_began"
+    COMBAT_ENDED = "combat_ended"
+    ROUND_BEGAN = "round_began"
+    ROUND_ENDED = "round_ended"
+    SURPRISE_RESOLVED = "surprise_resolved"
+    STANCE_CHOSEN = "stance_chosen"
+    ATTACK_RESOLVED = "attack_resolved"
+    WOUND_RECEIVED = "wound_received"
+    WOUND_CANCELLED = "wound_cancelled"
+    COMBATANT_OUT_OF_FIGHT = "combatant_out_of_fight"
+    COMBAT_TASK_RESOLVED = "combat_task_resolved"
+    INTERFERENCE_CHANGED = "interference_changed"
+    #: ``12.2``: the engine prompts, it never decides.
+    MISDEED_CHECK_PROMPT = "misdeed_check_prompt"
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Event:

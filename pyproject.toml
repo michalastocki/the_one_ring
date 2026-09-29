@@ -110,9 +110,12 @@ name = "rules subsystems are independent"
 type = "independence"
 # Shared leaves (resources, shadow, injury, contest) are excluded by design:
 # every subsystem may depend on them, but they may depend on nothing at L4.
+# 01.1's own example list omits creation; it is a subsystem like any other and the
+# constraint it states — no subsystem imports another — covers it.
 # Uncomment each module as it lands; see 01-architecture.md §1.1.
 modules = [
-    # "tor.rules.combat",
+    "tor.rules.combat",
+    "tor.rules.creation",
     # "tor.rules.journey",
     # "tor.rules.council",
     # "tor.rules.treasure",
@@ -131,7 +134,7 @@ type = "layers"
 # shadow genuinely needs resources: every function in it moves Shadow, and only
 # resources.recompute_conditions may write the Miserable flag derived from it (03.8, 11.6).
 layers = [
-    "(tor.rules.combat) | (tor.rules.journey) | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | tor.rules.creation",
+    "tor.rules.combat | (tor.rules.journey) | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | tor.rules.creation",
     "tor.rules.injury | tor.rules.contest | tor.rules.shadow",
     "tor.rules.resources",
     "tor.rules.context",

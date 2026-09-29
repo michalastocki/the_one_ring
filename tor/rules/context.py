@@ -145,13 +145,22 @@ class RulesContext:
                 f"no effect bus registered for {actor_id!r}; the RulesContext was built without it"
             ) from exc
 
-    def hook_context(self, hook: Hook, actor: object, **extra: Any) -> HookContext:
-        """A :class:`HookContext` carrying this context's scene and environment."""
+    def hook_context(
+        self, hook: Hook, actor: object, *, stance: str | None = None, **extra: Any
+    ) -> HookContext:
+        """A :class:`HookContext` carrying this context's scene and environment.
+
+        ``stance`` is named rather than left to ``extra`` because ``HookContext`` has a
+        field for it and ``04.3.3``'s effects predicate on it — the Cultural Virtue that
+        converts a Combat Task to a secondary action does so only in one stance, and could
+        not see it otherwise.
+        """
         return HookContext(
             hook=hook,
             actor=actor,
             scene=self.scene,
             environment=self.environment,
+            stance=stance,
             extra=extra,
         )
 

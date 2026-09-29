@@ -458,6 +458,31 @@ def set_flag(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -
     return _effect(effect_id, kind, {hook: listen}, params)
 
 
+@register_factory("offer_action")
+def offer_action(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -> Effect:
+    """``{"hook": "ON_KILL", "action": "extra_attack"}`` — offer an option on any hook.
+
+    The ``ActionContribution`` counterpart to :func:`numeric_modifier` and :func:`set_flag`,
+    for the hooks whose answer is neither a number nor a boolean but *a thing the player or
+    Loremaster may now do*: Cleaving on ``ON_KILL``, an extra icon-spend option on
+    ``SPECIAL_DAMAGE_OPTIONS``, immunity to a Combat Task on ``STANCE_OPTIONS``, a Wound
+    cancelled for a drive point on ``WOUND_INTERCEPT``.
+
+    Everything but ``hook`` and ``action`` travels in ``payload``, because what an option
+    means is the dispatching subsystem's business and never this factory's.
+    """
+    hook = _hook(params, effect_id)
+    action = str(params.get("action", ""))
+    if not action:
+        raise ContentError("offer_action needs an 'action'", entity_id=str(effect_id))
+    payload = dict(params.get("payload", {}))
+
+    def listen(_ctx: HookContext) -> Contribution:
+        return ActionContribution(source=effect_id, action=action, payload=payload)
+
+    return _effect(effect_id, kind, {hook: listen}, params)
+
+
 @register_factory("replace_value", replaces=True)
 def replace_value(effect_id: EffectId, kind: EffectKind, params: Mapping[str, Any]) -> Effect:
     """``{"hook": "MODIFY_ITEM_LOAD", "value": 1}`` — override a value outright (``04.2.2``).

@@ -41,6 +41,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from typing import Any
 
 from tor.effects.hooks import (
     ActionContribution,
@@ -409,12 +410,8 @@ def _spend_hope(hero: Hero, amount: int, source: ChangeSource) -> list[Event]:
 
 def _gain_hope(hero: Hero, amount: int, source: ChangeSource, *, ctx: RulesContext) -> list[Event]:
     bus = ctx.bus(hero.id)
-    hook_ctx = ctx.hook_context(
-        Hook.MODIFY_HOPE_RECOVERY,
-        hero,
-        route=str(source),
-        **{f"route_{source}": True},
-    )
+    routed: dict[str, Any] = {"route": str(source), f"route_{source}": True}
+    hook_ctx = ctx.hook_context(Hook.MODIFY_HOPE_RECOVERY, hero, **routed)
     contributions = bus.collect(Hook.MODIFY_HOPE_RECOVERY, hook_ctx)
     gain = max(0, bus.apply_numeric(Hook.MODIFY_HOPE_RECOVERY, hook_ctx, amount).value)
 

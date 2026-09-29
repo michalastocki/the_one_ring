@@ -19,5 +19,45 @@
   {"id": "hideous_toughness", "name": "Hideous Toughness",
    "factory": "spend_drive_for",
    "params": {"hook": "DAMAGE_INTERCEPT", "cost": 0, "trigger": "would_reach_zero",
-              "grant": {"piercing_blow": true, "restore_full_endurance": true}}}
+              "grant": {"piercing_blow": true, "restore_full_endurance": true}}},
+
+  {"id": "deathless", "name": "Deathless",
+   "factory": "offer_action",
+   "params": {"hook": "WOUND_INTERCEPT", "action": "cancel_wound", "payload": {"cost": 1}}},
+
+  {"id": "long_reach", "name": "Long Reach",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_ENGAGEMENT", "delta": 1}},
+
+  {"id": "unnerving_bulk", "name": "Unnerving Bulk",
+   "factory": "numeric_modifier",
+   "params": {"hook": "MODIFY_ATTACK_TN", "delta": 2}},
+
+  {"id": "sundering_stroke", "name": "Sundering Stroke",
+   "factory": "offer_action",
+   "params": {"hook": "SPECIAL_DAMAGE_OPTIONS", "action": "special_damage",
+              "payload": {"options": ["break_shield"]}}},
+
+  {"id": "unshakeable_menace", "name": "Unshakeable Menace",
+   "factory": "offer_action",
+   "params": {"hook": "STANCE_OPTIONS", "action": "immune_to_task",
+              "payload": {"task": "intimidate_foe"}}},
+
+  {"id": "withering_gaze", "name": "Withering Gaze",
+   "factory": "set_flag",
+   "params": {"hook": "MODIFY_TARGET_PROTECTION_ROLL", "flag": "ill_favoured"}},
+
+  {"id": "rending_claws", "name": "Rending Claws",
+   "factory": "set_flag",
+   "params": {"hook": "MODIFY_WOUND_SEVERITY_ROLL", "flag": "ill_favoured"}},
+
+  {"id": "flees_when_broken", "name": "Flees when Broken",
+   "factory": "offer_action",
+   "params": {"hook": "ON_ROUND_START", "action": "flee",
+              "payload": {"when": "no_drive_and_unengaged"}}},
+
+  {"id": "guttering_courage", "name": "Guttering Courage",
+   "factory": "offer_action",
+   "params": {"hook": "ON_ROUND_END", "action": "drain_drive",
+              "payload": {"amount": 1, "when": "full_sunlight"}}}
 ]}

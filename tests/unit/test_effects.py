@@ -567,6 +567,26 @@ class TestFactories:
         # through this set.
         assert "replace_value" in REPLACEMENT_FACTORIES
 
+    def test_offer_action_offers_whatever_the_pack_names(self) -> None:
+        # The ActionContribution counterpart to numeric_modifier and set_flag, for the
+        # hooks whose answer is a thing the player or Loremaster may now do (04.2.2).
+        effect = build_effect(
+            EffectId("cleaving"),
+            EffectKind.ENCHANTED_REWARD,
+            "offer_action",
+            {"hook": "ON_KILL", "action": "extra_attack", "payload": {"against": "engaged"}},
+        )
+        bus = EffectBus()
+        bus.register(effect, EffectSource.item("axe#1"))
+        [contribution] = bus.collect(Hook.ON_KILL, ctx(Hook.ON_KILL))
+        assert isinstance(contribution, ActionContribution)
+        assert contribution.action == "extra_attack"
+        assert contribution.payload == {"against": "engaged"}
+
+    def test_offer_action_needs_an_action(self) -> None:
+        with pytest.raises(ContentError, match="needs an 'action'"):
+            build_effect(EffectId("x"), EffectKind.VIRTUE, "offer_action", {"hook": "ON_KILL"})
+
     def test_replace_value_needs_a_value(self) -> None:
         with pytest.raises(ContentError, match="needs a 'value'"):
             build_effect(

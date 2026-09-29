@@ -367,9 +367,8 @@ def gain_shadow(
     else:
         gained = points
 
-    hook_ctx = ctx.hook_context(
-        Hook.MODIFY_SHADOW_GAIN, hero, source=str(source), **{f"source_{source.value}": True}
-    )
+    named: dict[str, Any] = {"source": str(source), f"source_{source.value}": True}
+    hook_ctx = ctx.hook_context(Hook.MODIFY_SHADOW_GAIN, hero, **named)
     # Collected once and then both folded and consumed: an effect that reduces Shadow may
     # carry a usage budget, and dispatching the hook a second time to find out which ones
     # contributed would fire every listener twice.
