@@ -32,7 +32,7 @@ from tor.effects.library import REPLACEMENT_FACTORIES, build_effect, build_predi
 from tor.errors import ContentError, RuleViolation
 from tor.model.conditions import ConditionSet
 from tor.model.ids import AbilityId, EffectId
-from tor.rolls import FeatDicePolicy, RollPurpose, build_request
+from tor.rolls import FeatDicePolicy, RollPurpose, Support, build_request
 
 
 def ctx(hook: Hook = Hook.MODIFY_ROLL_REQUEST, **kwargs: object) -> HookContext:
@@ -62,13 +62,6 @@ class FakeCharacter:
 
     def rating(self, ability: AbilityId) -> int:
         return self._ratings.get(str(ability), 0)
-
-
-class Support:
-    def __init__(self, rating: int = 1, *, is_focus: bool = False, approved: bool = True) -> None:
-        self.rating = rating
-        self.is_focus = is_focus
-        self.approved = approved
 
 
 class TestRegistration:
@@ -710,9 +703,11 @@ class TestBuildRequest:
 
     def test_a_focused_supporter_replaces_rather_than_stacks(self) -> None:
         actor = FakeCharacter()
-        ordinary = build_request(actor, None, bus=actor.effects, support=Support(rating=2))
+        ordinary = build_request(
+            actor, None, bus=actor.effects, support=Support(rating=2, approved=True)
+        )
         focused = build_request(
-            actor, None, bus=actor.effects, support=Support(rating=2, is_focus=True)
+            actor, None, bus=actor.effects, support=Support(rating=2, is_focus=True, approved=True)
         )
         assert ordinary.bonus_dice == 1
         assert focused.bonus_dice == 2
@@ -720,12 +715,12 @@ class TestBuildRequest:
     def test_an_unskilled_supporter_is_refused(self) -> None:
         actor = FakeCharacter()
         with pytest.raises(RuleViolation, match="at least rank 1"):
-            build_request(actor, None, bus=actor.effects, support=Support(rating=0))
+            build_request(actor, None, bus=actor.effects, support=Support(rating=0, approved=True))
 
     def test_unapproved_support_is_refused(self) -> None:
         actor = FakeCharacter()
         with pytest.raises(RuleViolation, match="approval"):
-            build_request(actor, None, bus=actor.effects, support=Support(approved=False))
+            build_request(actor, None, bus=actor.effects, support=Support(rating=2, approved=False))
 
     def test_a_useful_item_adds_one_die(self) -> None:
         actor = FakeCharacter()

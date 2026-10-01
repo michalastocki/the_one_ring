@@ -82,6 +82,15 @@
     "hook": "MODIFY_FATIGUE_GAIN",
     "flag": "no_fatigue"
    }
+  },
+  {
+   "id": "example_road_hardened",
+   "name": "Road-hardened",
+   "factory": "numeric_modifier",
+   "params": {
+    "hook": "ON_JOURNEY_END",
+    "delta": 1
+   }
   }
  ]
 }

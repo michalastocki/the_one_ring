@@ -18,12 +18,26 @@ from tor.effects.hooks import Hook, HookContext
 from tor.effects.library import build_effect
 from tor.model.abilities import COMBAT_PROFICIENCIES, SKILLS
 from tor.model.attributes import AttributeSet
-from tor.model.conditions import ResourcePool, StandardOfLiving, standard_of_living_for
+from tor.model.conditions import (
+    RegionType,
+    ResourcePool,
+    Season,
+    StandardOfLiving,
+    standard_of_living_for,
+)
 from tor.model.derive import DerivedStat, Modifier
 from tor.model.gear import ArmourCategory, ArmourInstance, ArmourType, Gear
 from tor.model.hero import Hero
 from tor.model.ids import AbilityId, CallingId, CultureId, EffectId, HeroId, ItemId
-from tor.rolls import Degree, Outcome, RollRequest, build_request, resolve
+from tor.rolls import (
+    Degree,
+    Outcome,
+    RollPurpose,
+    RollRequest,
+    RollResult,
+    build_request,
+    resolve,
+)
 from tor.rules.contest import ContestOutcome, ResistanceContest, evaluate
 from tor.rules.context import RulesContext
 from tor.rules.creation import (
@@ -49,6 +63,20 @@ from tor.rules.creation import (
     choose_reward_and_virtue,
     choose_skills,
     spend_previous_experience,
+)
+from tor.rules.journey import (
+    FAILED_MARCH_WARM,
+    MARCHING_BASE,
+    Hex,
+    Journey,
+    JourneyRole,
+    TerrainKind,
+    apply_step,
+    forced_march_fatigue,
+    journey_day_warnings,
+    journey_days,
+    marching_distance,
+    resolve_step,
 )
 from tor.rules.resources import (
     ChangeSource,
@@ -676,3 +704,144 @@ class TestShadowInvariants:
 
         request = build_request(hero, AbilityId("hunting"), bus=bus, target_number=14)
         assert bool(request.ill_favoured_sources) == (shadow == max_hope)
+
+
+class TestJourneyInvariants:
+    """19.5 for the journey (spec 10.3, 10.7) — the path arithmetic, over arbitrary paths."""
+
+    @staticmethod
+    def _journey(path: tuple[Hex, ...], season: Season, **kwargs: object) -> Journey:
+        return Journey(
+            origin="A",
+            destination="B",
+            path=path,
+            season=season,
+            roles={HeroId("h"): {JourneyRole(role) for role in JourneyRole}},
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    @staticmethod
+    def _path(count: int, hard: int = 0) -> tuple[Hex, ...]:
+        return tuple(
+            Hex(
+                index=i,
+                terrain=TerrainKind.HARD if i < hard else TerrainKind.EASY,
+                region=RegionType.WILD,
+            )
+            for i in range(count)
+        )
+
+    @given(
+        icons=st.integers(min_value=0, max_value=6),
+        season=st.sampled_from(list(Season)),
+        succeeded=st.booleans(),
+    )
+    @settings(max_examples=60, deadline=None)
+    def test_a_marching_distance_is_always_at_least_one_hex(
+        self, icons: int, season: Season, succeeded: bool
+    ) -> None:
+        # No roll may leave the Company standing still: a failure still carries one hex.
+        roll = RollResult(
+            request=RollRequest(purpose=RollPurpose.MARCHING_TEST, target_number=14),
+            feat_dice=(9,),
+            kept_feat=9,
+            success_dice=(),
+            total=20 if succeeded else 1,
+            outcome=Outcome.SUCCESS if succeeded else Outcome.FAILURE,
+            degree=Degree.SUCCESS if succeeded else Degree.NONE,
+            icons=icons,
+        )
+        distance = marching_distance(roll, season)
+        assert distance >= 1
+        if succeeded:
+            assert distance == MARCHING_BASE + icons
+        else:
+            assert distance <= FAILED_MARCH_WARM
+
+    @given(
+        length=st.integers(min_value=1, max_value=30),
+        position=st.integers(min_value=0, max_value=30),
+        icons=st.integers(min_value=0, max_value=6),
+        season=st.sampled_from(list(Season)),
+        succeeded=st.booleans(),
+    )
+    @settings(max_examples=120, deadline=None)
+    def test_a_step_never_walks_past_the_destination_or_backwards(
+        self, length: int, position: int, icons: int, season: Season, succeeded: bool
+    ) -> None:
+        # The off-by-one 10.1 warns about, as a property: position stays within the path,
+        # never retreats, and an event is drawn exactly when the Company has not arrived.
+        assume(position < length)
+        journey = self._journey(self._path(length), season, position=position)
+        roll = RollResult(
+            request=RollRequest(purpose=RollPurpose.MARCHING_TEST, target_number=14),
+            feat_dice=(9,),
+            kept_feat=9,
+            success_dice=(),
+            total=20 if succeeded else 1,
+            outcome=Outcome.SUCCESS if succeeded else Outcome.FAILURE,
+            degree=Degree.SUCCESS if succeeded else Degree.NONE,
+            icons=icons,
+        )
+        step = resolve_step(journey, roll)
+        assert position < step.position <= length
+        assert step.arrived == (step.position == length)
+        assert (step.event_hex is None) == step.arrived
+        if step.event_hex is not None:
+            assert step.event_hex is journey.path[step.position - 1]
+
+        apply_step(journey, step)
+        assert journey.position == step.position
+        assert journey.remaining >= 0
+        assert journey.finished == step.arrived
+
+    @given(
+        length=st.integers(min_value=1, max_value=30),
+        icons=st.integers(min_value=0, max_value=6),
+        season=st.sampled_from(list(Season)),
+    )
+    @settings(max_examples=60, deadline=None)
+    def test_repeated_marches_always_terminate_in_arrival(
+        self, length: int, icons: int, season: Season
+    ) -> None:
+        # Every march covers at least one hex, so the path is finite in the strong sense.
+        journey = self._journey(self._path(length), season)
+        roll = RollResult(
+            request=RollRequest(purpose=RollPurpose.MARCHING_TEST, target_number=14),
+            feat_dice=(1,),
+            kept_feat=1,
+            success_dice=(),
+            total=1,
+            outcome=Outcome.FAILURE,
+            degree=Degree.NONE,
+            icons=icons,
+        )
+        for _ in range(length + 1):
+            if journey.finished:
+                break
+            apply_step(journey, resolve_step(journey, roll))
+        assert journey.finished and journey.position == length
+
+    @given(
+        length=st.integers(min_value=1, max_value=30),
+        hard=st.integers(min_value=0, max_value=30),
+        mounted=st.booleans(),
+        forced=st.booleans(),
+        adjustment=st.integers(min_value=-5, max_value=5),
+    )
+    @settings(max_examples=120, deadline=None)
+    def test_the_day_count_is_never_negative_and_never_exceeds_the_plain_rate(
+        self, length: int, hard: int, mounted: bool, forced: bool, adjustment: int
+    ) -> None:
+        # 10.7's two reductions only ever shorten the trip, and no combination of them can
+        # produce a negative number of days.
+        assume(hard <= length)
+        path = self._path(length, hard)
+        plain = self._journey(path, Season.SUMMER, day_adjustments=adjustment)
+        journey = self._journey(
+            path, Season.SUMMER, mounted=mounted, forced_march=forced, day_adjustments=adjustment
+        )
+        assert journey_days(journey) >= 0
+        assert journey_days(journey) <= journey_days(plain)
+        assert bool(journey_day_warnings(journey)) == (mounted and forced)
+        assert forced_march_fatigue(journey) == (journey_days(journey) if forced else 0)

@@ -144,6 +144,39 @@
      "hope": 1
     }
    }
+  },
+  {
+   "id": "example_cv_ancient_days",
+   "name": "Memory of Ancient Days",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "favour_rolls",
+   "params": {
+    "hook": "MODIFY_JOURNEY_EVENT_ROLL",
+    "purpose": "journey_event"
+   }
+  },
+  {
+   "id": "second_cv_ways_of_the_wild",
+   "name": "Ways of the Wild",
+   "culture": "second_folk",
+   "min_wisdom": 2,
+   "factory": "set_flag",
+   "params": {
+    "hook": "JOURNEY_ROLE_LIMITS",
+    "flag": "multiple_roles"
+   }
+  },
+  {
+   "id": "second_cv_hardy_pony",
+   "name": "Hardy Pony",
+   "culture": "second_folk",
+   "min_wisdom": 2,
+   "factory": "numeric_modifier",
+   "params": {
+    "hook": "MODIFY_MOUNT_VIGOUR",
+    "delta": 1
+   }
   }
  ]
 }

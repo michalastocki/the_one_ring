@@ -90,6 +90,15 @@ class EventKind(StrEnum):
     #: ``12.2``: the engine prompts, it never decides.
     MISDEED_CHECK_PROMPT = "misdeed_check_prompt"
 
+    # -- journey (``10``) ---------------------------------------------------------------
+    JOURNEY_BEGAN = "journey_began"
+    MARCHING_TEST_RESOLVED = "marching_test_resolved"
+    PERILOUS_AREA_ENTERED = "perilous_area_entered"
+    PERILOUS_AREA_CLEARED = "perilous_area_cleared"
+    JOURNEY_EVENT_RESOLVED = "journey_event_resolved"
+    JOURNEY_INTERRUPTED = "journey_interrupted"
+    JOURNEY_ENDED = "journey_ended"
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Event:

@@ -1,8 +1,18 @@
 """Risk, the consequences of failure, and sources of injury (``16``).
 
-A **shared leaf** (``01.1``): every subsystem may depend on it, and it depends on nothing
-else at L4 — not even :mod:`tor.rules.resources`. Everything here returns an Outcome; the
-caller applies it, normally by handing :func:`loss_delta` to ``resources.change_endurance``.
+A **shared leaf** (``01.1``): every subsystem may depend on it. Almost everything here
+returns an Outcome and leaves the applying to the caller, normally by handing
+:func:`loss_delta` to ``resources.change_endurance``.
+
+:func:`wound_hero` is the exception, and the reason this module depends on
+:mod:`tor.rules.resources` after all. ``01.1`` names injury as the place a subsystem goes to
+inflict a Wound — "when journey needs to inflict a Wound, it calls ``tor.rules.injury`` (a
+shared L4 leaf)" — and checking the Wounded box drops a Dying hero's Endurance to zero and
+can flip Weary, both of which only ``resources`` may write. So this one function mutates and
+emits ``WOUND_RECEIVED``, against the grain of the rest of the module and of ``01.4``,
+because the alternative is combat, journey and the sources of injury each keeping their own
+copy of ``08.8`` — which ``04.7`` forbids outright. The shared-leaves contract already
+orders injury above resources for exactly this kind of need.
 
 Two systems meet in this module, and ``16.4.2`` is the reason they share one:
 
@@ -13,13 +23,17 @@ Two systems meet in this module, and ``16.4.2`` is the reason they share one:
 
 :data:`LOSS_FOR_SHAPE` is the bridge between them.
 
-Nothing here mutates state (``01.4``). This module fires no hooks and defines no event
-kinds of its own.
+Apart from :func:`wound_hero` nothing here mutates state, and this module fires no hooks
+and defines no event kinds of its own.
 
-**Not here yet.** ``apply_injury`` and ``16.4.4``'s fatal circumstance — where a Wound or
-the Dying condition becomes death outright, with no HEALING window — wait on Wounds, which
-arrive with combat at build step 11. :class:`InjuryContext` lands now so the input type is
-fixed.
+**Not here yet.** ``apply_injury`` — the full ``16.4.3`` flow, where a source's cadence
+drives repeated rolls and its ``zero_endurance`` override replaces ``07.2``'s default
+unconsciousness — and ``16.4.4``'s fatal circumstance, where a Wound or the Dying condition
+becomes death outright with no HEALING window, both still wait. The fatal rule needs a way
+to say a hero is dead, and the model has none: ``03`` gives :class:`~tor.model.hero.Hero`
+``dying`` and no counterpart, so inventing one is a model change rather than an injury one.
+:class:`InjuryContext` fixes the input type, and :func:`wound_hero` is the half ``01.1``
+asks for now.
 """
 
 from __future__ import annotations
@@ -31,6 +45,8 @@ from typing import Any
 
 from tor.dice import FeatFace, Randomness
 from tor.errors import ContentError, RuleViolation
+from tor.events import Event, EventKind
+from tor.model.hero import Hero
 from tor.rolls import (
     FeatDicePolicy,
     RollPurpose,
@@ -39,6 +55,8 @@ from tor.rolls import (
     policy_sources,
     resolve,
 )
+from tor.rules.context import RulesContext
+from tor.rules.resources import ChangeSource, change_endurance, recompute_conditions
 from tor.tables import LookupTable, Sentinel
 
 __all__ = [
@@ -56,10 +74,13 @@ __all__ = [
     "RiskOutcome",
     "RollAdvice",
     "daily_poison_check",
+    "healing_penalty_dice",
     "loss_delta",
     "resolve_risky_roll",
     "roll_endurance_loss",
     "should_roll",
+    "unscathed_face",
+    "wound_hero",
 ]
 
 
@@ -363,3 +384,58 @@ def healing_penalty_dice(level: LossLevel) -> int:
 def unscathed_face(*, inverted: bool = False) -> FeatFace:
     """The face that means Unscathed, for a caller scripting or explaining a roll."""
     return FeatFace.EYE if inverted else FeatFace.RUNE
+
+
+# -- inflicting a Wound ------------------------------------------------------------------
+
+
+def wound_hero(
+    hero: Hero,
+    *,
+    ctx: RulesContext,
+    source: ChangeSource,
+    injury_days: int = 0,
+    dying: bool = False,
+    payload: Mapping[str, Any] | None = None,
+    rolls: tuple[RollResult, ...] = (),
+) -> list[Event]:
+    """Mark a hero Wounded, wherever the harm came from (``08.8``).
+
+    ``01.1`` names this module as the home: "when journey needs to inflict a Wound, it calls
+    ``tor.rules.injury`` (a shared L4 leaf)". Combat, a journey's Terrible Misfortune and a
+    source of injury all check the same box, and ``04.7`` forbids three copies of the rule —
+    so the box is checked here and the callers differ only in what they put on the event.
+
+    ``dying`` carries ``08.8``'s whole escalation. A Grievous first Wound and a second Wound
+    reach the same place: Endurance drops to zero and the hero is Dying. The caller decides
+    *which* of those happened (combat reads the severity table, a fatal fall is declared);
+    this applies the consequence either way, and does it once rather than twice — a hero
+    already at zero Endurance has nothing left to lose.
+
+    ``injury_days`` only ever rises: ``07.7`` counts down a single recovery, so a second
+    Severe injury while the first is still mending does not shorten it.
+    """
+    second = hero.conditions.wounded
+    hero.conditions.wounded = True
+    hero.injury_days = max(hero.injury_days, injury_days)
+    hero.dying = hero.dying or dying
+
+    events: list[Event] = []
+    if dying and hero.endurance:
+        events += change_endurance(hero, -hero.endurance, source, ctx=ctx)
+    events += recompute_conditions(hero, ctx=ctx)
+    events.append(
+        Event(
+            kind=EventKind.WOUND_RECEIVED,
+            actor=hero.id,
+            payload={
+                "injury_days": hero.injury_days,
+                "dying": hero.dying,
+                "second": second,
+                "source": str(source),
+                **dict(payload or {}),
+            },
+            rolls=rolls,
+        )
+    )
+    return events

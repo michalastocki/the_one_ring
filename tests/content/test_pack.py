@@ -890,10 +890,6 @@ class TestHookCoverage:
     #: covers every EffectKind (19.7); council and fellowship land at steps 13 and 15.
     AWAITING_SUBSYSTEM = frozenset(
         {
-            # journey (10) — build step 12
-            Hook.MODIFY_JOURNEY_EVENT_ROLL,
-            Hook.JOURNEY_ROLE_LIMITS,
-            Hook.ON_JOURNEY_END,
             # council (09) — build step 13
             Hook.MODIFY_AUDIENCE_ATTITUDE,
             # progression, fellowship and phase (15, 17) — build steps 15 and 16
@@ -902,7 +898,6 @@ class TestHookCoverage:
             Hook.ON_WISDOM_GAIN,
             Hook.ON_PHASE_START,
             Hook.ON_PHASE_END,
-            Hook.MODIFY_MOUNT_VIGOUR,
             Hook.MODIFY_USEFUL_ITEM_LIMIT,
             # observers the session and Eye layers wire up — build steps 15 and 16
             Hook.MODIFY_ROLL_RESULT,

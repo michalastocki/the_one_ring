@@ -49,14 +49,14 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–11 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+Build steps 1–12 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
 `tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, all four
 shared rules leaves — `tor.rules.resources`, `tor.rules.contest`, `tor.rules.injury` and
-`tor.rules.shadow` — plus `tor.rules.creation`, `tor.rules.combat` and `content/example/`.
-That is the pure core, all three seams, the whole leaf tier every later subsystem rests on,
-the pipeline that turns a content pack into a playable hero and Company, and the fight they
-get into. Journey (12) onward is not yet implemented, nor are the session layer, the API
-and the CLI.
+`tor.rules.shadow` — plus `tor.rules.creation`, `tor.rules.combat`, `tor.rules.journey` and
+`content/example/`. That is the pure core, all three seams, the whole leaf tier every later
+subsystem rests on, the pipeline that turns a content pack into a playable hero and Company,
+the fight they get into, and the road they walk to reach it. Council (13) onward is not yet
+implemented, nor are the session layer, the API and the CLI.
 
 Steps 8 and 9 were taken **out of order**: `tor.rules.contest` and `tor.rules.injury`
 landed before `tor.rules.creation`, so most of the shared-leaf tier was complete before the
@@ -111,6 +111,28 @@ Deliberate deviations from the spec are recorded, each in the module that makes 
   tuple although stage 5 adds to both, which would make the mandated cascade unable to
   withdraw the Calling's grant alone; `calling_favoured` and `calling_feature` are separate
   fields, unioned at materialisation.
+- `tor/rules/injury.py` — `01.1` names injury as the module a subsystem calls to inflict a
+  Wound, and `04.7` forbids combat, journey and the sources of injury each keeping their own
+  copy of `08.8`. So `wound_hero` mutates and emits an event, against the grain of the rest
+  of the module, and injury depends on `tor.rules.resources` after all: checking the Wounded
+  box drops a Dying hero's Endurance to zero, which only `resources` may write.
+- `tor/rules/journey.py` — four. `10.1` declares a `TerrainKind` enum identical to `04.4`'s
+  `Terrain`, which would stop a hex's terrain from reaching an `Environment`; the name
+  aliases the type. `10.2` types `validate_roles(assignment, bus)` with one bus, but
+  `JOURNEY_ROLE_LIMITS` is carried by a Cultural Virtue permitting **its holder** several
+  roles, so the question is per hero and takes the context. `10.3.2` writes one mutating
+  `step`; it is split into `resolve_step` → `apply_step` per `01.4`, as `08.5`'s attack was.
+  And `10.4.2` gives `MODIFY_JOURNEY_EVENT_ROLL` two meanings the roll pipeline does not
+  have — a numeric contribution shifts the Feat die *result* rather than adding a die, and a
+  Favoured flag *replaces* the region's policy rather than cancelling against it — so it is
+  the one per-subsystem roll hook `build_request` does not fold.
+
+Two of the spec's own self-contradictions are resolved in `tor/rules/journey.py` rather than
+deviated from. `10.2` says a hero holding several roles needs an effect's permission and then
+says a Company of fewer than four *must* double up; necessity wins where it applies. `10.7`'s
+code block drops the mounted halving whenever a forced march is also declared, while its
+prose says to apply the halving afterwards and to flag the combination for the Loremaster —
+the prose wins, and the flag is a `Warning_`.
 
 ## Development
 
