@@ -890,8 +890,6 @@ class TestHookCoverage:
     #: covers every EffectKind (19.7); council and fellowship land at steps 13 and 15.
     AWAITING_SUBSYSTEM = frozenset(
         {
-            # council (09) — build step 13
-            Hook.MODIFY_AUDIENCE_ATTITUDE,
             # progression, fellowship and phase (15, 17) — build steps 15 and 16
             Hook.FREE_UNDERTAKINGS,
             Hook.ON_VALOUR_GAIN,
