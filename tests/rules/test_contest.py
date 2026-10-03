@@ -159,6 +159,26 @@ class TestAborting:
         with pytest.raises(StateError, match="already finished"):
             contest.abort("disaster again")
 
+    def test_a_disaster_on_the_final_attempt_is_still_a_disaster(self) -> None:
+        # 09.3.2: "regardless of remaining attempts" includes none. The attempt is recorded
+        # first and exhausts the budget; the abort must still land, or the Disaster would
+        # be downgraded to a Partial merely for coming last.
+        contest = ResistanceContest(resistance=9, attempts_allowed=2)
+        contest.record(attempt(feats=[10], successes=[4]))
+        contest.record(attempt(feats=[1], successes=[1]))
+        assert contest.exhausted
+        assert evaluate(contest) is ContestOutcome.PARTIAL
+
+        contest.abort("disaster")
+        assert evaluate(contest) is ContestOutcome.DISASTER
+
+    def test_a_contest_already_won_cannot_be_aborted(self) -> None:
+        contest = ResistanceContest(resistance=1, attempts_allowed=3)
+        contest.record(attempt(feats=[10], successes=[4]))
+        assert contest.met
+        with pytest.raises(StateError, match="Resistance was met"):
+            contest.abort("too late")
+
 
 class TestUnboundedContest:
     def test_an_endeavour_with_no_time_limit_never_exhausts(self) -> None:

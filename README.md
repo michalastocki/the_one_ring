@@ -49,15 +49,16 @@ Three seams carry the whole design, and nothing may duplicate them:
 
 ## Status
 
-Build steps 1–13 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
+Build steps 1–14 and 16 of the order in `00-README.md` §5 are complete: `tor.dice`,
 `tor.tables`, `tor.rolls`, `tor.model`, `tor.effects`, `tor.content`, `tor.events`, all four
 shared rules leaves — `tor.rules.resources`, `tor.rules.contest`, `tor.rules.injury` and
 `tor.rules.shadow` — plus `tor.rules.creation`, `tor.rules.combat`, `tor.rules.journey`,
-`tor.rules.council` and `content/example/`. That is the pure core, all three seams, the whole
-leaf tier every later subsystem rests on, the pipeline that turns a content pack into a
-playable hero and Company, the fight they get into, the road they walk to reach it, and the
-hall they are heard in. Endeavour (14) onward is not yet implemented, nor are the session
-layer, the API and the CLI.
+`tor.rules.council`, `tor.rules.endeavour` and `content/example/`. That is the pure core, all
+three seams, the whole leaf tier every later subsystem rests on, the pipeline that turns a
+content pack into a playable hero and Company, the fight they get into, the road they walk to
+reach it, the hall they are heard in, and the long task they set their hands to. Treasure,
+the Eye, progression and fellowship (15) are not yet implemented, nor are the session layer,
+the API and the CLI.
 
 Steps 8 and 9 were taken **out of order**: `tor.rules.contest` and `tor.rules.injury`
 landed before `tor.rules.creation`, so most of the shared-leaf tier was complete before the
@@ -128,10 +129,11 @@ Deliberate deviations from the spec are recorded, each in the module that makes 
   Favoured flag *replaces* the region's policy rather than cancelling against it — so it is
   the one per-subsystem roll hook `build_request` does not fold.
 
-- `tor/rules/council.py` — `18.3` types `begin_council` as returning the
-  `ResistanceContest` itself, which cannot carry the goal, the audience or its attitude;
-  those outlive an attempt and none belongs on the shared machine. A `Council` holds them
-  with the contest under `.contest`, which is what the API facade returns. `09.2.3` also
+- `tor/rules/council.py` and `tor/rules/endeavour.py` — `18.3` types `begin_council` and
+  `begin_endeavour` as returning the `ResistanceContest` itself, which cannot carry a
+  council's goal and audience or an endeavour's task, time limit and abandonment; those
+  outlive an attempt and none belongs on the shared machine. A `Council` and an `Endeavour`
+  hold them with the contest under `.contest`, which is what the API facade returns. `09.2.3` also
   says `MODIFY_COUNCIL_ATTEMPTS` raises "the maximum number of Skill rolls a hero may
   attempt", but `09.1`'s machine has one shared budget and no per-hero cap to raise; the
   hook is collected from every participant and summed, so a Virtue letting its holder
@@ -149,6 +151,14 @@ the prose wins, and the flag is a `Warning_`.
 two adapters differ on exactly that. The shared engine returns `TOTAL_FAILURE`; the council
 adapter promotes it, because `09.2.5` gives a council no row for "every attempt failed" short
 of being seen as a threat. An endeavour that merely ran out of time is not.
+
+`tor/rules/endeavour.py` resolves a fourth: `16.3`'s table grades three ways a roll *stays*
+failed inside an endeavour and is silent on Success with Woe, which `16.2.1` offers on any
+failed Standard roll. An endeavour roll is no exception — taking the woe records the attempt
+as a bare success. Settling it exposed a gap in the contest leaf, now closed:
+`ResistanceContest.abort` refused an exhausted contest, so a Disaster rolled on the *final*
+attempt would have been downgraded to a Partial merely for coming last. `09.3.2` says a
+Disaster ends the endeavour "regardless of remaining attempts", which includes none.
 
 ## Development
 

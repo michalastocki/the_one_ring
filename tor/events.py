@@ -96,6 +96,12 @@ class EventKind(StrEnum):
     COUNCIL_ATTEMPT = "council_attempt"
     COUNCIL_ENDED = "council_ended"
 
+    # -- Skill Endeavours (``09.3``) ----------------------------------------------------
+    ENDEAVOUR_BEGAN = "endeavour_began"
+    ENDEAVOUR_ROLL = "endeavour_roll"
+    ENDEAVOUR_ABANDONED = "endeavour_abandoned"
+    ENDEAVOUR_ENDED = "endeavour_ended"
+
     # -- journey (``10``) ---------------------------------------------------------------
     JOURNEY_BEGAN = "journey_began"
     MARCHING_TEST_RESOLVED = "marching_test_resolved"
