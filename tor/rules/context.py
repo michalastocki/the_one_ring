@@ -146,14 +146,21 @@ class RulesContext:
             ) from exc
 
     def hook_context(
-        self, hook: Hook, actor: object, *, stance: str | None = None, **extra: Any
+        self,
+        hook: Hook,
+        actor: object,
+        *,
+        stance: str | None = None,
+        purpose: str | None = None,
+        **extra: Any,
     ) -> HookContext:
         """A :class:`HookContext` carrying this context's scene and environment.
 
-        ``stance`` is named rather than left to ``extra`` because ``HookContext`` has a
-        field for it and ``04.3.3``'s effects predicate on it — the Cultural Virtue that
-        converts a Combat Task to a secondary action does so only in one stance, and could
-        not see it otherwise.
+        ``stance`` and ``purpose`` are named rather than left to ``extra`` because
+        ``HookContext`` has a field for each and effects predicate on them. The Cultural
+        Virtue that converts a Combat Task to a secondary action applies in one stance only
+        (``04.3.3``), and the one that favours journey event rolls matches on the purpose
+        (``10.4.2``) — neither could see its own trigger if it arrived in ``extra``.
         """
         return HookContext(
             hook=hook,
@@ -161,6 +168,7 @@ class RulesContext:
             scene=self.scene,
             environment=self.environment,
             stance=stance,
+            purpose=purpose,
             extra=extra,
         )
 

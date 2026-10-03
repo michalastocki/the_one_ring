@@ -1,9 +1,10 @@
-"""Shared builders for the combat tests (spec 08, 12).
+"""Shared builders for the rules tests (spec 08, 10, 12).
 
 A fight needs a hero with real gear, an adversary instance with a real stat block, and a
-bus for each — enough setup that repeating it per test would bury the rule being asserted.
-Everything here comes from `content/example/`, which is invented: 19.9 forbids a fixture
-that reproduces the licensed book's tables, and nothing below asserts a value from it.
+bus for each; a journey needs a Company of four with a role apiece — enough setup that
+repeating it per test would bury the rule being asserted. Everything here comes from
+`content/example/`, which is invented: 19.9 forbids a fixture that reproduces the licensed
+book's tables, and nothing below asserts a value from it.
 """
 
 from __future__ import annotations
@@ -140,5 +141,53 @@ class Fight:
 def fight(pack: ContentPack) -> Callable[[], Fight]:
     def make() -> Fight:
         return Fight(pack)
+
+    return make
+
+
+#: The four journey roles, one hero each — 10.2's ordinary Company.
+ROLE_NAMES: tuple[tuple[str, str], ...] = (
+    ("guide", "guide"),
+    ("hunter", "hunter"),
+    ("watcher", "lookout"),
+    ("scout", "scout"),
+)
+
+
+class Party:
+    """A Company on the road: a hero per role, a bus each, and the context over them."""
+
+    def __init__(self, pack: ContentPack) -> None:
+        from tor.rules.journey import JourneyRole
+
+        self.pack = pack
+        self.heroes: dict[HeroId, Hero] = {}
+        self.buses: dict[object, EffectBus] = {}
+        self.roles: dict[HeroId, set[JourneyRole]] = {}
+        for name, role in ROLE_NAMES:
+            hero = self.add(name)
+            self.roles[hero.id] = {JourneyRole(role)}
+
+    def add(self, name: str, **kwargs: object) -> Hero:
+        hero = build_hero(name, **kwargs)  # type: ignore[arg-type]
+        self.heroes[hero.id] = hero
+        self.buses[hero.id] = EffectBus()
+        return hero
+
+    def __getitem__(self, name: str) -> Hero:
+        return self.heroes[HeroId(name)]
+
+    def register(self, name: str, effect_id: str, source: object) -> None:
+        self.buses[HeroId(name)].register(self.pack.instantiate(effect_id), source)  # type: ignore[arg-type]
+
+    @property
+    def ctx(self) -> RulesContext:
+        return RulesContext(gear=self.pack, buses=dict(self.buses))  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def party(pack: ContentPack) -> Callable[[], Party]:
+    def make() -> Party:
+        return Party(pack)
 
     return make

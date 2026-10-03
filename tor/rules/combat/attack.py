@@ -58,7 +58,8 @@ from tor.rolls import (
 )
 from tor.rules.combat.state import Combatant, CombatState, Stance
 from tor.rules.context import RulesContext
-from tor.rules.resources import ChangeSource, change_endurance, recompute_conditions
+from tor.rules.injury import wound_hero
+from tor.rules.resources import ChangeSource, change_endurance
 from tor.tables import LookupTable, Sentinel
 
 __all__ = [
@@ -1109,33 +1110,37 @@ def _apply_wound(
             )
         ]
     events: list[Event] = []
+    severity_payload = {
+        "severity": None if wound.severity is None else str(wound.severity),
+        "slain": wound.slain,
+    }
     if target.is_hero:
-        hero = target.hero
-        if wound.dying and hero.conditions.wounded:
-            # 08.8: a second Wound skips the severity roll; Endurance drops to zero.
-            events += change_endurance(hero, -hero.endurance, ChangeSource.COMBAT, ctx=ctx)
-        hero.conditions.wounded = True
-        hero.injury_days = max(hero.injury_days, wound.injury_days)
-        hero.dying = hero.dying or wound.dying
-        if wound.dying and hero.endurance:
-            events += change_endurance(hero, -hero.endurance, ChangeSource.COMBAT, ctx=ctx)
-        events += recompute_conditions(hero, ctx=ctx)
-    else:
-        target.adversary.apply_wound()
-
-    events.append(
-        Event(
-            kind=EventKind.WOUND_RECEIVED,
-            actor=target.ref,
-            payload={
-                "severity": None if wound.severity is None else str(wound.severity),
-                "injury_days": wound.injury_days,
-                "dying": wound.dying,
-                "slain": wound.slain,
-            },
+        # 08.8's escalation — a second Wound, and a Grievous first one, both end Dying with
+        # Endurance at zero — belongs to injury, which 01.1 makes the shared home for
+        # inflicting a Wound however it arrived.
+        events += wound_hero(
+            target.hero,
+            ctx=ctx,
+            source=ChangeSource.COMBAT,
+            injury_days=wound.injury_days,
+            dying=wound.dying,
+            payload=severity_payload,
             rolls=() if wound.roll is None else (wound.roll,),
         )
-    )
+    else:
+        target.adversary.apply_wound()
+        events.append(
+            Event(
+                kind=EventKind.WOUND_RECEIVED,
+                actor=target.ref,
+                payload={
+                    **severity_payload,
+                    "injury_days": wound.injury_days,
+                    "dying": wound.dying,
+                },
+                rolls=() if wound.roll is None else (wound.roll,),
+            )
+        )
     hook_ctx = ctx.hook_context(Hook.ON_WOUND_RECEIVED, target.actor)
     ctx.consume(target.ref, ctx.bus(target.ref).collect(Hook.ON_WOUND_RECEIVED, hook_ctx), hook_ctx)
     return events

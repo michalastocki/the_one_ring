@@ -65,6 +65,7 @@ __all__ = [
     "RollRequest",
     "RollResult",
     "RollingCharacter",
+    "Support",
     "SupportInput",
     "attribute_tn",
     "build_request",
@@ -452,6 +453,27 @@ class SupportInput(Protocol):
     def approved(self) -> bool: ...
 
 
+@dataclass(frozen=True, slots=True)
+class Support:
+    """A concrete :class:`SupportInput` — the shape every subsystem needs (``02.3.3``).
+
+    ``02.3.3`` makes support generic: a journey event, a council roll and an ordinary Skill
+    roll all take it on the same terms, so the record belongs here beside the protocol
+    rather than once per subsystem. Which companion is supporting is the caller's
+    bookkeeping; the roll only needs the three numbers the protocol names.
+
+    ``is_focus`` is **the supporter's** Fellowship Focus naming the acting hero, not the
+    other way round (``03.6`` makes the relation directed), and it *replaces* the ordinary
+    +1d rather than stacking with it — :func:`_support_dice` owns that.
+    """
+
+    rating: int
+    is_focus: bool = False
+    #: The Loremaster's ruling that the circumstances allow it. Defaults to ``False`` so a
+    #: caller that forgets is refused rather than quietly granted a die.
+    approved: bool = False
+
+
 def build_request(
     character: RollingCharacter,
     ability: AbilityId | None,
@@ -479,11 +501,17 @@ def build_request(
 
     ``extra_hooks`` names further hooks whose contributions shape *this* roll in exactly
     the same way ``MODIFY_ROLL_REQUEST`` does — ``04.3`` has one per subsystem
-    (``MODIFY_SHADOW_TEST``, ``MODIFY_COUNCIL_ROLL``, ``MODIFY_JOURNEY_EVENT_ROLL``,
-    ``MODIFY_WOUND_SEVERITY_ROLL``, ``MODIFY_PROTECTION_ROLL``), so that a Cultural Virtue
-    adding ``+1d`` against Sorcery can say which kind of roll it means without predicating
-    on a purpose string. They are collected with the same loop rather than a second one:
-    ``01.3``'s catalogue exists to keep that folding in one place.
+    (``MODIFY_SHADOW_TEST``, ``MODIFY_COUNCIL_ROLL``, ``MODIFY_WOUND_SEVERITY_ROLL``,
+    ``MODIFY_PROTECTION_ROLL``), so that a Cultural Virtue adding ``+1d`` against Sorcery can
+    say which kind of roll it means without predicating on a purpose string. They are
+    collected with the same loop rather than a second one: ``01.3``'s catalogue exists to keep
+    that folding in one place.
+
+    ``MODIFY_JOURNEY_EVENT_ROLL`` is the one per-subsystem roll hook that does **not** belong
+    here, and ``tor.rules.journey.determine_event`` dispatches it itself. ``10.4.2`` gives its
+    numeric contributions a different meaning — a shift of the Feat die *result*, per
+    ``02.2`` — and its Favoured flag replaces the region's policy rather than joining it.
+    Folding either through this loop would silently turn a result shift into a Success die.
     """
     ctx = HookContext(
         hook=Hook.MODIFY_ROLL_REQUEST,
