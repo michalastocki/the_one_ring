@@ -177,6 +177,20 @@
     "hook": "MODIFY_MOUNT_VIGOUR",
     "delta": 1
    }
+  },
+  {
+   "id": "example_cv_old_friends",
+   "name": "Old Friends",
+   "culture": "example_folk",
+   "min_wisdom": 2,
+   "factory": "replace_value",
+   "params": {
+    "hook": "MODIFY_AUDIENCE_ATTITUDE",
+    "value": "friendly",
+    "predicate": {
+     "flag": "audience_example_folk"
+    }
+   }
   }
  ]
 }

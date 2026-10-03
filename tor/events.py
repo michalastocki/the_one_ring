@@ -90,6 +90,12 @@ class EventKind(StrEnum):
     #: ``12.2``: the engine prompts, it never decides.
     MISDEED_CHECK_PROMPT = "misdeed_check_prompt"
 
+    # -- councils (``09``) --------------------------------------------------------------
+    COUNCIL_BEGAN = "council_began"
+    COUNCIL_INTRODUCTION = "council_introduction"
+    COUNCIL_ATTEMPT = "council_attempt"
+    COUNCIL_ENDED = "council_ended"
+
     # -- journey (``10``) ---------------------------------------------------------------
     JOURNEY_BEGAN = "journey_began"
     MARCHING_TEST_RESOLVED = "marching_test_resolved"

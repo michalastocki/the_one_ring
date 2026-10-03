@@ -40,6 +40,13 @@ from tor.rolls import (
 )
 from tor.rules.contest import ContestOutcome, ResistanceContest, evaluate
 from tor.rules.context import RulesContext
+from tor.rules.council import (
+    AudienceAttitude,
+    Council,
+    CouncilGoal,
+    end_council,
+    grade_for,
+)
 from tor.rules.creation import (
     AttributeChoice,
     CallingChoice,
@@ -462,6 +469,52 @@ class TestContestTermination:
         contest = ResistanceContest(resistance=resistance, attempts_allowed=allowed)
         contest.abort("disaster")
         assert evaluate(contest) in set(ContestOutcome)
+
+    @given(
+        resistance=st.sampled_from([3, 6, 9]),
+        allowed=st.integers(min_value=1, max_value=12),
+        successes=st.integers(min_value=0, max_value=12),
+        botched=st.booleans(),
+        aborted=st.booleans(),
+    )
+    @settings(max_examples=80, deadline=None)
+    def test_a_council_never_ends_in_total_failure(
+        self, resistance: int, allowed: int, successes: int, botched: bool, aborted: bool
+    ) -> None:
+        # 09.2.5 gives a council three outcomes, and TOTAL_FAILURE is not one of them: a
+        # Company that scored nothing is seen as a threat. The adapter's promotion has to
+        # hold for every state the shared engine can be in, not only the ones a worked
+        # example reaches.
+        contest = ResistanceContest(
+            resistance=resistance,
+            attempts_allowed=allowed,
+            successes=successes,
+            attempts_used=allowed,
+            botched_setup=botched,
+        )
+        if aborted:
+            contest.aborted = True
+        council = Council(
+            goal=CouncilGoal("a boon"),
+            grade=grade_for(resistance),
+            audience="folk",
+            participants=(HeroId("h"),),
+            attitude=AudienceAttitude.OPEN,
+            contest=contest,
+        )
+        result = end_council(council)
+        assert result.outcome is not ContestOutcome.TOTAL_FAILURE
+        assert result.outcome in {
+            ContestOutcome.SUCCESS,
+            ContestOutcome.PARTIAL,
+            ContestOutcome.DISASTER,
+        }
+        # Woe is offered on exactly the one row 09.2.5 makes a player decision.
+        assert result.woe_available == (result.outcome is ContestOutcome.PARTIAL)
+        if successes >= resistance:
+            assert result.outcome is ContestOutcome.SUCCESS
+        elif successes == 0 or botched or aborted:
+            assert result.outcome is ContestOutcome.DISASTER
 
 
 class TestCreatedHeroes:

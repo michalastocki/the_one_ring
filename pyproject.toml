@@ -117,7 +117,7 @@ modules = [
     "tor.rules.combat",
     "tor.rules.creation",
     "tor.rules.journey",
-    # "tor.rules.council",
+    "tor.rules.council",
     # "tor.rules.treasure",
     # "tor.rules.eye",
     # "tor.rules.fellowship",
@@ -136,7 +136,7 @@ type = "layers"
 # injury needs it for injury.wound_hero alone — 01.1 names injury as the place a subsystem
 # goes to inflict a Wound, and checking the Wounded box zeroes a Dying hero's Endurance.
 layers = [
-    "tor.rules.combat | tor.rules.journey | (tor.rules.council) | (tor.rules.endeavour) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | tor.rules.creation",
+    "tor.rules.combat | tor.rules.journey | tor.rules.council | (tor.rules.endeavour) | (tor.rules.treasure) | (tor.rules.eye) | (tor.rules.progression) | (tor.rules.fellowship) | tor.rules.creation",
     "tor.rules.injury | tor.rules.contest | tor.rules.shadow",
     "tor.rules.resources",
     "tor.rules.context",
