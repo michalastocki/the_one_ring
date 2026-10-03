@@ -142,18 +142,30 @@ class ResistanceContest:
         self.successes += n
 
     def abort(self, reason: str) -> None:
-        """End the contest immediately, short of its attempt budget (``09.3.2``).
+        """End the contest as a Disaster (``09.3.2``).
 
         A Disaster during an endeavour means the task fails completely and **cannot be
         resumed**, which is distinct from simply running out of attempts — hence a path of
         its own rather than fast-forwarding ``attempts_used``.
 
+        An *exhausted* contest may still be aborted, and that is deliberate. ``09.3.2`` says a
+        Disaster ends the endeavour "regardless of remaining attempts", which includes none:
+        a Disaster rolled on the final attempt is recorded first, exhausting the budget, and
+        refusing the abort then would quietly downgrade it to a Partial merely because it
+        came last. What may not be aborted is a contest already won — there is nothing left
+        to lose — or one already aborted.
+
         The reason is a plain string rather than injury's ``FailureShape``: ``01.1`` says a
-        shared leaf may depend on nothing at L4, and the Risk model lives in
-        ``tor.rules.injury``. The endeavour adapter, a subsystem, does the mapping.
+        shared leaf may depend on nothing at L4 beyond what it must, and the Risk model lives
+        in ``tor.rules.injury``. The endeavour adapter, a subsystem, does the mapping.
         """
-        if self.finished:
+        if self.aborted:
             raise StateError("this contest is already finished; it cannot be aborted again")
+        if self.met:
+            raise StateError(
+                "this contest is already finished: its Resistance was met, so there is no "
+                "Disaster left to suffer"
+            )
         self.aborted = True
         self.abort_reason = reason
 

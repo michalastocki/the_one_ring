@@ -71,6 +71,18 @@ from tor.rules.creation import (
     choose_skills,
     spend_previous_experience,
 )
+from tor.rules.endeavour import (
+    EndeavourGoal,
+    EndeavourRoll,
+    EndeavourSetup,
+    TimeLimit,
+    abandon,
+    apply_roll,
+    begin_endeavour,
+    end_endeavour,
+)
+from tor.rules.endeavour import RollOutcome as EndeavourOutcome
+from tor.rules.injury import FailureShape
 from tor.rules.journey import (
     FAILED_MARCH_WARM,
     MARCHING_BASE,
@@ -469,6 +481,63 @@ class TestContestTermination:
         contest = ResistanceContest(resistance=resistance, attempts_allowed=allowed)
         contest.abort("disaster")
         assert evaluate(contest) in set(ContestOutcome)
+
+    @given(
+        goal=st.sampled_from(list(EndeavourGoal)),
+        limit=st.sampled_from([TimeLimit.SHORT, TimeLimit.ENOUGH, TimeLimit.PLENTY]),
+        rolls=st.lists(
+            st.tuples(st.booleans(), st.sampled_from(list(FailureShape))),
+            min_size=0,
+            max_size=12,
+        ),
+        walk_away=st.booleans(),
+    )
+    @settings(max_examples=120, deadline=None)
+    def test_only_a_disaster_ends_an_endeavour_in_disaster(
+        self,
+        goal: EndeavourGoal,
+        limit: TimeLimit,
+        rolls: list[tuple[bool, FailureShape]],
+        walk_away: bool,
+    ) -> None:
+        # 09.3.2 names three ways an endeavour ends short of success: out of time, walked
+        # away from, or ruined. Only the third is a Disaster, and it is final whatever the
+        # budget had left. Driven through the contest directly, because what is under test
+        # is the adapter's grading, not the dice.
+        endeavour = begin_endeavour(
+            EndeavourSetup(task="t", goal=goal, time_limit=limit, participants=(HeroId("h"),))
+        )
+        disaster_seen = False
+        for succeeded, shape in rolls:
+            if endeavour.finished:
+                break
+            rng = ScriptedRandomness(feats=[10 if succeeded else 1], successes=[4])
+            roll = resolve(RollRequest(rating=1, target_number=14), rng)
+            is_disaster = not roll.succeeded and shape is FailureShape.DISASTER
+            apply_roll(
+                endeavour,
+                EndeavourOutcome(
+                    attempt=EndeavourRoll(hero=HeroId("h"), ability=AbilityId("scan")),
+                    roll=roll,
+                    shape=FailureShape.SIMPLE if roll.succeeded else shape,
+                    woe_available=False,
+                    successes=roll.magnitude(1),
+                    loss_level=None,
+                ),
+            )
+            if is_disaster:
+                disaster_seen = True
+                assert endeavour.finished, "a Disaster ends it regardless of attempts left"
+        if not endeavour.finished:
+            if not walk_away:
+                return
+            abandon(endeavour, "walked away")
+
+        result = end_endeavour(endeavour)
+        assert (result.outcome is ContestOutcome.DISASTER) == disaster_seen
+        assert result.resumable == (
+            result.outcome in {ContestOutcome.PARTIAL, ContestOutcome.TOTAL_FAILURE}
+        )
 
     @given(
         resistance=st.sampled_from([3, 6, 9]),
